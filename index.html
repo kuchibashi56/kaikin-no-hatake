@@ -30,6 +30,9 @@
 
   .card{background:#201b16;border:1px solid #2e2720;border-radius:14px;padding:12px;margin-bottom:10px}
   .card.run{border-color:#4a3f28;background:#241d14}
+  .card[onclick]{cursor:pointer}
+  .card[onclick]:active{border-color:#6b5c3a}
+  .chev{color:#6f655a;font-size:22px;width:16px}
   .row{display:flex;align-items:center;gap:10px}
   .ico{font-size:26px;width:34px;text-align:center;flex:0 0 auto}
   .name{font-weight:600}
@@ -725,7 +728,7 @@ function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
 /* ============================================================
    表示層
    ============================================================ */
-let tab='gather',WELCOME=null;
+let tab='area',fac=null,area=null,WELCOME=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const mmss=m=>{const s=Math.max(0,Math.ceil(m/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -777,76 +780,164 @@ function nodeCard(n){
       (full?'　満杯。採取するまで増えない':'　次まで '+mmss(left))+'</div></div>';
   }
 }
-function viewGather(){
-  let h='';
-  AREAS.forEach(a=>{
+const areaReady=a=>a.unlock==='start'||has(a.unlock);
+function backBar(label,fn,icon,name){
+  return '<div class="row" style="margin:2px 2px 10px">'+
+    '<button class="ghost" onclick="'+fn+'">← '+label+'</button>'+
+    '<div class="ico">'+icon+'</div>'+
+    '<div class="grow"><div class="name">'+name+'</div></div></div>';
+}
+function viewArea(){
+  /* エリアを選んでいるとき: そのエリアの採取先だけを出す */
+  if(area){
+    const a=areaOf(area);
+    if(!a||!areaReady(a)){area=null;return viewArea();}
     const ns=NODES.filter(n=>n.area===a.id);
-    if(!(a.unlock==='start'||has(a.unlock))){
-      /* まだ行けないエリアも、存在だけは見せておく */
-      h+='<div class="card locked"><div class="row"><div class="ico">'+a.icon+'</div>'+
-         '<div class="grow"><div class="name q">'+a.name+'</div>'+
-         '<div class="hint">'+esc(a.hint)+'</div></div></div></div>';
-      return;
-    }
-    h+='<h2>'+a.icon+' '+a.name+'</h2>';
-    if(!ns.length){
-      /* 集落のように、採取ではなく交易をする場所 */
-      h+='<div class="card sub">ここでは物を採らない。'+
-         '持って行った物と引き換えに、手に入らない物をもらえる（作業タブ）。</div>';
-      return;
-    }
+    const h=backBar('エリア','goArea(null)',a.icon,a.name);
+    if(!ns.length)return h+'<div class="card sub">ここでは物を採らない。'+
+      '持って行った物と引き換えに、手に入らない物をもらえる（施設タブの住民）。</div>';
     const vis=ns.filter(n=>!n.requires||has(n.requires));
-    h+=vis.length?vis.map(nodeCard).join('')
-      :'<div class="card sub">ここで採れる物はまだ扱えない。道具がいる。</div>';
-  });
-  return h+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先が現れる。'+
-  '良い道具は待ち時間を縮める。閉じている間も上限までたまる。</div>';
-}
-
-function viewCraft(){
-  let h='<div class="sub" style="margin:4px 2px">📦 置ける量 素材1種あたり '+invCap(S)+
-    '（収納箱 '+Math.floor(count('crate'))+'個 / 石蔵 '+
-    Math.floor(count('vault'))+'個）</div>';
-  if(S.jobs.length){
-    h+='<h2 style="margin-top:8px">稼働中</h2>';
-    h+=S.jobs.map((j,i)=>{
-      const r=RECIPES.find(x=>x.id===j.id),k=Object.keys(r.out)[0],it=ITEMS[k];
-      const left=j.done-now(),done=left<=0;
-      const pct=done?100:100-left/ms(timeOf(S,r))*100;
-      return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
-        '<div class="grow"><div class="name">'+it.name+'</div>'+
-        '<div class="sub">'+ITEMS[j.station].name+'　'+(done?'完成':mmss(left))+'</div></div>'+
-        '<button onclick="collect('+i+')"'+(done?'':' disabled')+'>'+
-        (done?'受け取る':'加工中')+'</button></div>'+
-        '<div class="bar gold"><i style="width:'+pct+'%"></i></div></div>';
-    }).join('');
-    h+='<h2>作れる物</h2>';
+    return h+(vis.length?vis.map(nodeCard).join('')
+      :'<div class="card sub">ここで採れる物はまだ扱えない。道具がいる。</div>');
   }
-  const list=RECIPES.filter(r=>ok(r.unlock));
-  if(!list.length)return h+'<div class="card sub">作れる物がない。まず枝と石を集める。</div>';
-  h+=list.map(r=>{
-    const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
-    const st=stationOk(S,r),slot=slotOk(S,r);
-    const fits=!!r.time||outFits(S,r);
-    const can=st&&slot&&affordIn(S,inp)&&fits;
-    const owned=first?Math.floor(count(first)):0,s=stationFor(S,r);
-    return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
-      '<div class="grow"><div class="name">'+(it?it.name:'???')+
-        (it?TAGS[it.kind]:'')+(owned?'<span class="tag">所持 '+owned+'</span>':'')+
-        (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
-      '<div class="cost">'+costLine(inp)+'</div>'+modLine(it)+
-      (st?'':'<div class="need">'+r.station.map(x=>ITEMS[x].name).join(' か ')+' が必要</div>')+
-      (st&&!slot?'<div class="need">'+ITEMS[s].name+'が全て稼働中（'+
-        busyAt(S,s)+'/'+Math.floor(count(s))+'）</div>':'')+
-      (fits?'':'<div class="need">置き場がない。収納箱を作ると増える</div>')+
-      '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
-      (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
-  }).join('');
-  return h+'<div class="sub" style="margin:4px 2px">設備は何個でも作れる。'+
-    '時間のかかる加工は、設備の数だけ並列できる。</div>';
+  /* 一覧: どこに何がたまっているかが分かるようにする */
+  return AREAS.map(a=>{
+    if(!areaReady(a))
+      return '<div class="card locked"><div class="row"><div class="ico">'+a.icon+'</div>'+
+        '<div class="grow"><div class="name q">？？？</div>'+
+        '<div class="hint">'+esc(a.hint)+'</div></div></div></div>';
+    const ns=NODES.filter(n=>n.area===a.id);
+    const vis=ns.filter(n=>!n.requires||has(n.requires));
+    let stock=0,full=0;
+    vis.forEach(n=>{const x=accNode(n);stock+=x.n;if(x.n>=capOf(n))full++;});
+    return '<div class="card'+(stock?' run':'')+'" onclick="goArea(\''+a.id+'\')">'+
+      '<div class="row"><div class="ico">'+a.icon+'</div>'+
+      '<div class="grow"><div class="name">'+a.name+
+      (stock?'<span class="tag t">たまり '+stock+'</span>':'')+
+      (full?'<span class="tag s">満杯 '+full+'</span>':'')+'</div>'+
+      '<div class="sub">'+(ns.length?vis.length+' / '+ns.length+' か所が使える'
+                                    :'採取はできない場所')+'</div></div>'+
+      '<div class="ico chev">›</div></div></div>';
+  }).join('')+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先とエリアが現れる。'+
+  '閉じている間も上限までたまる。</div>';
 }
 
-function viewFarm(){
+/* --- 1件ぶんの描画。施設画面から使い回す --- */
+function jobCard(j,i){
+  const r=RECIPES.find(x=>x.id===j.id),k=Object.keys(r.out)[0],it=ITEMS[k];
+  const left=j.done-now(),done=left<=0;
+  const pct=done?100:100-left/ms(timeOf(S,r))*100;
+  return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
+    '<div class="grow"><div class="name">'+it.name+'</div>'+
+    '<div class="sub">'+ITEMS[j.station].name+'　'+(done?'完成':mmss(left))+'</div></div>'+
+    '<button onclick="collect('+i+')"'+(done?'':' disabled')+'>'+
+    (done?'受け取る':'加工中')+'</button></div>'+
+    '<div class="bar gold"><i style="width:'+pct+'%"></i></div></div>';
+}
+function recipeCard(r){
+  const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
+  const st=stationOk(S,r),slot=slotOk(S,r);
+  const fits=!!r.time||outFits(S,r);
+  const can=st&&slot&&affordIn(S,inp)&&fits;
+  const owned=first?Math.floor(count(first)):0,sx=stationFor(S,r);
+  return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
+    '<div class="grow"><div class="name">'+(it?it.name:'???')+
+      (it?TAGS[it.kind]:'')+(owned?'<span class="tag">所持 '+owned+'</span>':'')+
+      (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
+    '<div class="cost">'+costLine(inp)+'</div>'+modLine(it)+
+    (st?'':'<div class="need">'+r.station.map(x=>ITEMS[x].name).join(' か ')+' が必要</div>')+
+    (st&&!slot?'<div class="need">'+ITEMS[sx].name+'が全て稼働中（'+
+      busyAt(S,sx)+'/'+Math.floor(count(sx))+'）</div>':'')+
+    (fits?'':'<div class="need">置き場がない。収納箱を作ると増える</div>')+
+    '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
+    (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
+}
+
+/* --- 施設 --- */
+const HANDID='hand';
+const FACKINDS=['station','plot','storage','villager'];
+function facilities(){
+  /* 素手でできる物の置き場。作業台を作る前はここしかない */
+  const out=[{id:HANDID,name:'手仕事',icon:'🤲',count:1,kind:'hand'}];
+  Object.keys(ITEMS).forEach(k=>{
+    const it=ITEMS[k],c=Math.floor(count(k));
+    if(c<1||FACKINDS.indexOf(it.kind)<0)return;
+    out.push({id:k,name:it.name,icon:it.icon,count:c,kind:it.kind});
+  });
+  return out;
+}
+const jobsAt=id=>S.jobs.map((j,i)=>({j:j,i:i})).filter(x=>x.j.station===id);
+/* その施設で扱えるレシピ。station が複数書いてあるレシピは、
+   実際に使われる1つ（stationFor）の下にだけ出す */
+function recipesAt(id){
+  return RECIPES.filter(r=>{
+    if(!ok(r.unlock))return false;
+    if(!r.station)return id===HANDID;
+    return stationOk(S,r)&&stationFor(S,r)===id;
+  });
+}
+function facStatus(f){
+  let t='';
+  if(f.id==='farm'){
+    let ready=0,empty=0;
+    S.plots.forEach(p=>{if(!p){empty++;return;}
+      const k=CROPS[p.crop]?p.crop:'wheat';ready+=(p.n||0)*cropYield(S,k);});
+    if(ready)t+='<span class="tag t">収穫 '+ready+'</span>';
+    if(empty)t+='<span class="tag s">空き '+empty+'</span>';
+    return t;
+  }
+  const js=jobsAt(f.id);
+  if(js.length){
+    const d=js.filter(x=>now()>=x.j.done).length;
+    if(d)t+='<span class="tag t">完成 '+d+'</span>';
+    return t+'<span class="tag s">稼働 '+js.length+'/'+f.count+'</span>';
+  }
+  const n=recipesAt(f.id).filter(r=>
+    affordIn(S,inputsOf(r))&&slotOk(S,r)&&(!!r.time||outFits(S,r))).length;
+  return n?'<span class="tag s">作れる '+n+'</span>':'';
+}
+function facDesc(f){
+  if(f.id==='farm')return '区画 '+S.plots.length;
+  if(f.kind==='storage')return '置ける量 1個につき +'+
+    (f.id==='vault'?tv('cap.vault',CAP_VAULT):tv('cap.box',CAP_BOX));
+  if(f.kind==='villager')return '訪ねて、品を分けてもらう';
+  const n=recipesAt(f.id).length;
+  return n?n+' 種類を扱える':'持っているだけで効く';
+}
+function viewFac(){
+  /* 施設を選んでいるとき */
+  if(fac){
+    const f=facilities().find(x=>x.id===fac);
+    if(!f){fac=null;return viewFac();}
+    let h=backBar('施設','goFac(null)',f.icon,
+      f.name+(f.count>1?'<span class="tag s">×'+f.count+'</span>':''));
+    if(f.id==='farm')return h+plotsHtml();
+    if(f.kind==='storage')
+      return h+'<div class="card sub">置ける量を増やす。いまの上限は素材1種あたり '+invCap(S)+
+        '（収納箱 '+Math.floor(count('crate'))+'個 / 石蔵 '+
+        Math.floor(count('vault'))+'個）。</div>';
+    const js=jobsAt(f.id),rs=recipesAt(f.id);
+    if(js.length)h+='<h2 style="margin-top:0">稼働中</h2>'+js.map(x=>jobCard(x.j,x.i)).join('');
+    if(rs.length)h+='<h2>ここで扱える物</h2>'+rs.map(recipeCard).join('');
+    const it=ITEMS[f.id];
+    if(it&&it.mods)h+='<div class="card"><div class="name">効果</div>'+modLine(it)+'</div>';
+    if(!js.length&&!rs.length&&!(it&&it.mods))
+      h+='<div class="card sub">ここで扱える物はまだない。</div>';
+    return h;
+  }
+  /* 一覧: どこで何が動いているかが一目で分かるようにする */
+  return facilities().map(f=>
+    '<div class="card'+(jobsAt(f.id).length?' run':'')+'" onclick="goFac(\''+f.id+'\')">'+
+    '<div class="row"><div class="ico">'+f.icon+'</div>'+
+    '<div class="grow"><div class="name">'+f.name+
+    (f.count>1?'<span class="tag s">×'+f.count+'</span>':'')+facStatus(f)+'</div>'+
+    '<div class="sub">'+facDesc(f)+'</div></div>'+
+    '<div class="ico chev">›</div></div></div>').join('')+
+    '<div class="sub" style="margin:4px 2px">同じ施設を増やすと、その数だけ加工を並べて走らせられる。'+
+    '置ける量は素材1種あたり '+invCap(S)+'。</div>';
+}
+
+function plotsHtml(){
   syncPlots();
   if(!S.plots.length)return '<div class="card sub">畑がまだない。板材×4 と 石×3 で作れる。'+
     '畑を追加で作れば区画が増える。</div>';
@@ -984,11 +1075,10 @@ function welcomeHtml(){
 }
 
 const TABS=[
-  {id:'gather',label:'採取',icon:'🌳',view:viewGather},
-  {id:'craft', label:'作業',icon:'🛠',view:viewCraft},
-  {id:'farm',  label:'畑',  icon:'🟩',view:viewFarm},
-  {id:'codex', label:'図鑑',icon:'📖',view:viewCodex},
-  {id:'tune',  label:'調整',icon:'🎚',view:viewTune},
+  {id:'area', label:'エリア',icon:'🗺',view:viewArea},
+  {id:'fac',  label:'施設',  icon:'🛠',view:viewFac},
+  {id:'codex',label:'図鑑',  icon:'📖',view:viewCodex},
+  {id:'tune', label:'調整',  icon:'🎚',view:viewTune},
 ];
 function render(){
   syncPlots();
@@ -1012,7 +1102,9 @@ function render(){
     '" onclick="go(\''+x.id+'\')"><span class="nv">'+x.icon+'</span>'+x.label+'</button>').join('');
   if(tab==='tune')runSim();
 }
-function go(id){tab=id;render();}
+function go(id){tab=id;fac=null;area=null;render();}
+function goFac(id){fac=id;render();}
+function goArea(id){area=id;render();}
 function setScale(n){S.scale=n;save();render();}
 function reset(){const t=S.tune;S=fresh();S.tune=t;save();tab='gather';render();}
 accrueAll();
