@@ -629,8 +629,10 @@ function viewFarm(){
   const seedBtns=i=>open.map(k=>'<button class="seed" onclick="replant('+i+',\''+k+'\')">'+
     CROPS[k].icon+'</button>').join('');
   return '<div class="plots">'+S.plots.map((p,i)=>{
+    /* 作物が1種類しかない序盤は、絵文字だけのボタンだと何をする所か伝わらない */
     if(!p)return '<div class="plot"><div class="pi">🟫</div><div class="pt">空き</div>'+
-      '<div class="seeds">'+seedBtns(i)+'</div></div>';
+      (open.length>1?'<div class="seeds">'+seedBtns(i)+'</div>'
+        :'<button onclick="replant('+i+',\''+open[0]+'\')">植える</button>')+'</div>';
     const k=CROPS[p.crop]?p.crop:'wheat',cr=CROPS[k];
     const step=ms(growOf(S,k));
     const full=p.n>=cap,left=full?0:Math.max(0,p.at+step-now());
