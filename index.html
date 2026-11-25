@@ -6,7 +6,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14110e">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>解禁の畑 — Tier 3</title>
+<title>解禁の畑 — Tier 4</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -101,7 +101,7 @@
 </head>
 <body>
 <div id="app">
-  <h1>解禁の畑 <small>Tier 3</small></h1>
+  <h1>解禁の畑 <small>Tier 4</small></h1>
   <div class="inv" id="inv"></div>
   <div id="view"></div>
 </div>
@@ -124,6 +124,33 @@ const ITEMS={
   bread: {name:'パン',  icon:'🍞',kind:'material'},
   potato:{name:'じゃがいも',icon:'🥔',kind:'material'},
   baked: {name:'焼き芋',icon:'🍠',kind:'material'},
+
+  /* ---- Tier 4 の素材 ---- */
+  berry:  {name:'木の実',  icon:'🫐',kind:'material'},
+  herb:   {name:'薬草',    icon:'🍃',kind:'material'},
+  cobweb: {name:'クモの巣',icon:'🕸',kind:'material'},
+  cuore:  {name:'銅鉱石',  icon:'🔶',kind:'material'},
+  copper: {name:'銅',      icon:'🟠',kind:'material'},
+  thread: {name:'糸',      icon:'🧵',kind:'material'},
+  cloth:  {name:'布',      icon:'🧶',kind:'material'},
+  rope:   {name:'縄',      icon:'🪢',kind:'material'},
+  meat:   {name:'生肉',    icon:'🍖',kind:'material'},
+  hide:   {name:'毛皮',    icon:'🧳',kind:'material'},
+  fish:   {name:'魚',      icon:'🐟',kind:'material'},
+  salt:   {name:'塩',      icon:'🧂',kind:'material'},
+  spice:  {name:'香辛料',  icon:'🌶',kind:'material'},
+  feed:   {name:'飼葉',    icon:'🪴',kind:'material'},
+  cage:   {name:'生け捕りの檻',icon:'🧺',kind:'material'},
+  trap:   {name:'罠',      icon:'🪤',kind:'material'},
+  egg:    {name:'卵',      icon:'🥚',kind:'material'},
+  milk:   {name:'乳',      icon:'🥛',kind:'material'},
+
+  /* ---- 料理 ---- */
+  cheese: {name:'チーズ',      icon:'🧀',kind:'material'},
+  jerky:  {name:'干し肉',      icon:'🥓',kind:'material'},
+  soup:   {name:'野菜スープ',  icon:'🍲',kind:'material'},
+  pie:    {name:'木の実のパイ',icon:'🥧',kind:'material'},
+  grilled:{name:'焼き魚',      icon:'🍢',kind:'material'},
   ore:   {name:'鉱石',  icon:'🧱',kind:'material'},
   iron:  {name:'鉄',    icon:'🔩',kind:'material'},
 
@@ -148,6 +175,12 @@ const ITEMS={
              mods:[{k:'grow.wheat',mul:0.75},{k:'cy.wheat',add:1}]},
   pantry:   {name:'保存食棚',icon:'🍱',kind:'station',
              mods:[{k:'cd.branch',mul:0.75},{k:'cd.log',mul:0.8}]},
+  loom:     {name:'織機',    icon:'🪡',kind:'station'},
+  kitchen:  {name:'調理場',  icon:'🍳',kind:'station'},
+  /* 家畜は「設備」として扱う。飼葉を入れて待つと産物が出る仕組みで、
+     並列数はその動物を何匹飼っているかになる */
+  chicken:  {name:'鶏',      icon:'🐔',kind:'station'},
+  goat:     {name:'山羊',    icon:'🐐',kind:'station'},
 
   stone_axe:{name:'石の斧',    icon:'🪓',kind:'tool'},
   pickaxe:  {name:'石のツルハシ',icon:'⛏',kind:'tool'},
@@ -157,21 +190,51 @@ const ITEMS={
   bucket:   {name:'木のバケツ',  icon:'🪣',kind:'tool'},
   lantern:  {name:'ランタン',    icon:'🏮',kind:'tool',
              mods:[{k:'cd.ore',mul:0.7},{k:'cd.stone',mul:0.8}]},
+  rod:      {name:'釣竿',        icon:'🎣',kind:'tool'},
+  cart:     {name:'荷車',        icon:'🛒',kind:'tool'},
+  boat:     {name:'小舟',        icon:'🛶',kind:'tool'},
 };
 
+/* エリア。解禁は got: 条件で見る（材料として消える物を have: で見ると、
+   使い切った瞬間に行けなくなってしまうため） */
+const AREAS=[
+  {id:'home',   name:'庭',  icon:'🏡',unlock:'start',          hint:''},
+  {id:'forest', name:'森',  icon:'🌲',unlock:'got:stone_axe',  hint:'斧があれば、奥へ入れそうだ'},
+  {id:'cave',   name:'洞窟',icon:'🕳',unlock:'got:pickaxe',    hint:'固い岩を砕く物があれば'},
+  {id:'mount',  name:'山',  icon:'⛰',unlock:'got:rope',       hint:'崖を登る物があれば'},
+  {id:'village',name:'集落',icon:'🏘',unlock:'got:cart',       hint:'荷を運ぶ物があれば通えそうだ'},
+  {id:'sea',    name:'海',  icon:'🌊',unlock:'got:boat',       hint:'水に浮かぶ物があれば'},
+];
+
 const NODES=[
-  {id:'branch',name:'低木', icon:'🌳',cd:30, requires:null,
+  {id:'branch',name:'低木', icon:'🌳',cd:30, area:'home',  requires:null,
    yield:{branch:[2,3]},desc:'素手で枝を折る'},
-  {id:'stone', name:'石ころ',icon:'⛰', cd:45, requires:null,
+  {id:'stone', name:'石ころ',icon:'⛰', cd:45, area:'home',  requires:null,
    yield:{stone:[1,2]}, desc:'地面から拾う'},
-  {id:'log',   name:'大木', icon:'🌲',cd:120,requires:'have:stone_axe',
-   yield:{log:[2,3]},   desc:'斧を持っていないと歯が立たない'},
-  {id:'ore',   name:'鉱脈', icon:'🗻',cd:180,requires:'have:pickaxe',
-   yield:{ore:[1,2]},   desc:'ツルハシで削り出す'},
-  {id:'sand',  name:'砂地', icon:'🏖',cd:60, requires:'have:shovel',
+  {id:'sand',  name:'砂地', icon:'🏖',cd:60, area:'home',  requires:'have:shovel',
    yield:{sand:[2,3]},  desc:'シャベルで掘り返す'},
-  {id:'spring',name:'泉',   icon:'⛲',cd:90, requires:'have:bucket',
+
+  {id:'log',   name:'大木', icon:'🌲',cd:120,area:'forest',requires:'have:stone_axe',
+   yield:{log:[2,3]},   desc:'斧を持っていないと歯が立たない'},
+  {id:'bush',  name:'茂み', icon:'🌿',cd:90, area:'forest',requires:null,
+   yield:{berry:[2,3]}, desc:'低い枝に実がついている'},
+  {id:'spring',name:'泉',   icon:'⛲',cd:90, area:'forest',requires:'have:bucket',
    yield:{water:[1,2]}, desc:'桶で水を汲む'},
+
+  {id:'ore',   name:'鉱脈', icon:'🗻',cd:180,area:'cave',  requires:'have:pickaxe',
+   yield:{ore:[1,2]},   desc:'ツルハシで削り出す'},
+  {id:'web',   name:'巣穴', icon:'🕸',cd:100,area:'cave',  requires:'have:lantern',
+   yield:{cobweb:[2,3]},desc:'灯りがないと奥は見えない'},
+  {id:'cuvein',name:'銅脈', icon:'🔶',cd:200,area:'cave',  requires:'have:lantern',
+   yield:{cuore:[1,2]}, desc:'赤みがかった筋を削る'},
+
+  {id:'herbfield',name:'薬草地',icon:'🍃',cd:110,area:'mount',requires:null,
+   yield:{herb:[2,3]},  desc:'斜面に香りの強い草が生える'},
+
+  {id:'fishing',name:'漁場',icon:'🐟',cd:140,area:'sea',   requires:'have:rod',
+   yield:{fish:[1,2]},  desc:'沖に糸を垂らす'},
+  {id:'saltpan',name:'塩田',icon:'🧂',cd:120,area:'sea',   requires:null,
+   yield:{salt:[1,2]},  desc:'海水を干して採る'},
 ];
 
 /* station : 1つ以上持っていれば作れる。消費されない
@@ -233,8 +296,66 @@ const RECIPES=[
   {id:'pantry',out:{pantry:1},inputs:{baked:2,bread:2,plank:4},station:['workbench','workshop'],
    unlock:['got:baked'],reveal:['got:bread'],hint:'蓄えがあると、よく働ける'},
 
-  {id:'frontier',out:{},inputs:{brick:1,glass:1,baked:1},station:['workshop'],
-   unlock:['never'],reveal:['got:vault'],hint:'さらに先の素材 … まだ作れない'},
+  /* ---- Tier 4: 洞窟の奥と繊維 ---- */
+  {id:'rope',out:{rope:2},inputs:{cobweb:6,branch:4},station:['workbench','workshop'],
+   unlock:['got:cobweb'],reveal:['got:cobweb'],hint:'巣の糸を撚り合わせた物'},
+  {id:'loom',out:{loom:1},inputs:{plank:8,iron:2},station:['workbench','workshop'],
+   unlock:['got:cobweb'],reveal:['got:cobweb'],hint:'糸を織るための台'},
+  {id:'thread',out:{thread:2},inputs:{cobweb:4},station:['loom'],time:70,
+   unlock:['got:loom'],reveal:['got:loom'],hint:'巣をほぐして紡いだ物'},
+  {id:'cloth',out:{cloth:1},inputs:{thread:3},station:['loom'],time:110,
+   unlock:['got:thread'],reveal:['got:thread'],hint:'糸を織り上げた物'},
+  {id:'copper',out:{copper:1},inputs:{cuore:2,charcoal:1},station:['furnace'],time:130,
+   unlock:['got:cuore'],reveal:['got:cuore'],hint:'赤い鉱石を溶かした物'},
+
+  /* ---- 移動手段。これがエリアを開く ---- */
+  {id:'rod',out:{rod:1},inputs:{branch:4,thread:3},station:['workbench','workshop'],
+   unlock:['got:thread'],reveal:['got:thread'],hint:'水の中の物を獲る道具'},
+  {id:'cart',out:{cart:1},inputs:{plank:8,iron:3,rope:2},station:['workbench','workshop'],
+   unlock:['got:rope'],reveal:['got:rope'],hint:'荷を載せて遠くへ行く物'},
+  {id:'boat',out:{boat:1},inputs:{plank:10,cloth:4,rope:3},station:['workshop'],
+   unlock:['got:cloth'],reveal:['got:cloth'],hint:'水に浮かぶ物'},
+
+  /* ---- 狩りと家畜 ---- */
+  {id:'feed',out:{feed:3},inputs:{wheat:3,potato:2},station:['workbench','workshop'],
+   unlock:['got:potato'],reveal:['got:farm'],hint:'動物に与える物'},
+  {id:'trap',out:{trap:1},inputs:{iron:2,rope:1},station:['workbench','workshop'],
+   unlock:['got:rope'],reveal:['got:rope'],hint:'仕掛けて獲物を待つ物'},
+  {id:'hunt',out:{meat:2,hide:1},inputs:{trap:1,feed:2},station:null,
+   unlock:['got:herb'],reveal:['got:trap'],hint:'山に仕掛ける。罠と餌を使う'},
+  {id:'cage',out:{cage:1},inputs:{plank:4,rope:2,hide:2},station:['workbench','workshop'],
+   unlock:['got:hide'],reveal:['got:hide'],hint:'生きたまま捕らえる物'},
+  {id:'chicken',out:{chicken:1},inputs:{cage:1,feed:4},station:['workbench','workshop'],
+   unlock:['got:cage'],reveal:['got:cage'],hint:'手なずけると、毎日なにか産む'},
+  {id:'goat',out:{goat:1},inputs:{cage:1,feed:8,herb:4},station:['workbench','workshop'],
+   unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏より気難しい'},
+  {id:'egg',out:{egg:2},inputs:{feed:3},station:['chicken'],time:360,
+   unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏に飼葉を与えて待つ'},
+  {id:'milk',out:{milk:2},inputs:{feed:4,herb:2},station:['goat'],time:540,
+   unlock:['got:goat'],reveal:['got:goat'],hint:'山羊に飼葉と薬草を与えて待つ'},
+
+  /* ---- 集落との交易。station なしで、材料を渡して受け取る ---- */
+  {id:'trade_salt',out:{salt:6},inputs:{bread:2,baked:2},station:null,
+   unlock:['got:cart'],reveal:['got:cart'],hint:'集落で食べ物と引き換える'},
+  {id:'trade_spice',out:{spice:3},inputs:{pie:1,jerky:1},station:null,
+   unlock:['got:pie'],reveal:['got:salt'],hint:'集落で、ごちそうと引き換える'},
+
+  /* ---- 料理 ---- */
+  {id:'kitchen',out:{kitchen:1},inputs:{brick:6,plank:6,copper:2},station:['workshop'],
+   unlock:['got:copper'],reveal:['got:brick'],hint:'火と水を使う場所'},
+  {id:'jerky',out:{jerky:2},inputs:{meat:3,salt:2},station:['kitchen'],time:280,
+   unlock:['got:salt'],reveal:['got:kitchen'],hint:'肉を塩で保たせた物'},
+  {id:'cheese',out:{cheese:1},inputs:{milk:4,salt:2},station:['kitchen'],time:420,
+   unlock:['got:milk'],reveal:['got:kitchen'],hint:'乳を固めた物'},
+  {id:'soup',out:{soup:1},inputs:{potato:3,herb:2,water:2,salt:1},station:['kitchen'],time:200,
+   unlock:['got:salt'],reveal:['got:kitchen'],hint:'根菜と香草を煮た物'},
+  {id:'pie',out:{pie:1},inputs:{berry:4,flour:3,egg:2},station:['kitchen'],time:260,
+   unlock:['got:egg'],reveal:['got:kitchen'],hint:'木の実を包んで焼いた物'},
+  {id:'grilled',out:{grilled:2},inputs:{fish:2,salt:1,herb:1},station:['kitchen'],time:170,
+   unlock:['got:fish'],reveal:['got:kitchen'],hint:'獲れた物に火を通す'},
+
+  {id:'frontier',out:{},inputs:{spice:1,cheese:1,grilled:1},station:['workshop'],
+   unlock:['never'],reveal:['got:spice'],hint:'さらに先の何か … まだ作れない'},
 ];
 
 /* unlock: 'start' か flagOk が読める条件。畑に植えられるようになる条件 */
@@ -324,8 +445,14 @@ function flagOk(c,f){
   return false;
 }
 
+/* エリアが開いていて、かつ道具の条件も満たしているノードだけが採れる */
+const areaOf=id=>AREAS.find(a=>a.id===id);
+const areaOpen=(c,id)=>{const a=areaOf(id);
+  return !a||a.unlock==='start'||flagOk(c,a.unlock);};
+const nodeAvail=(c,n)=>areaOpen(c,n.area)&&(!n.requires||flagOk(c,n.requires));
+
 /* --- 放置の蓄積。閉じている間の経過を、開いた時にまとめて精算する --- */
-const nodeOpen=n=>!n.requires||flagOk(S,n.requires);
+const nodeOpen=n=>nodeAvail(S,n);
 function accNode(node){
   const a=S.acc[node.id]||(S.acc[node.id]={n:0,t:now()});
   /* まだ解禁していないノードはためない。解禁した時点から数え始める */
@@ -479,9 +606,10 @@ function simulate(maxSec=86400){
     }
     return q;};
 
+  let q=requiredQty(),qDirty=false;
   for(let t=0;t<=maxSec;t++){
     let acted=false;
-    NODES.filter(n=>!n.requires||flagOk(c,n.requires)).forEach(n=>{
+    NODES.filter(n=>nodeAvail(c,n)).forEach(n=>{
       if(t>=(c.ready[n.id]||0)){const y=yldOf(c,n);
         for(const k in y)giveIn(c,k,(y[k][0]+y[k][1])/2);
         c.ready[n.id]=t+cdOf(c,n);acted=true;}});
@@ -490,11 +618,11 @@ function simulate(maxSec=86400){
       if(t>=c.jobs[i].done){
         const r=RECIPES.find(x=>x.id===c.jobs[i].id);
         for(const k in r.out)giveIn(c,k,r.out[k]);
-        c.made[r.id]=1;
+        c.made[r.id]=1;qDirty=true;
         if(!log.find(x=>x.id===r.id))log.push(entry(r,t));
         c.jobs.splice(i,1);acted=true;}}
 
-    const q=requiredQty();
+    if(qDirty||t%15===0){q=requiredQty();qDirty=false;}
     const plots=Math.floor(cnt(c,'farm'));
     while(c.plots.length<plots)c.plots.push(null);
     /* 空き区画には、いま一番足りていない作物を植える */
@@ -521,7 +649,7 @@ function simulate(maxSec=86400){
                  outs.some(k=>cnt(c,k)+pend(k)<(q[k]||0));
       if(!want)continue;
       for(const k in inp)c.inv[k]=cnt(c,k)-inp[k];
-      c.started[r.id]=1;
+      c.started[r.id]=1;qDirty=true;
       if(r.time){c.jobs.push({id:r.id,station:stationFor(c,r),done:t+timeOf(c,r)});}
       else{for(const k in r.out)giveIn(c,k,r.out[k]);c.made[r.id]=1;
         if(!log.find(x=>x.id===r.id))log.push(entry(r,t));}
@@ -562,8 +690,8 @@ function modLine(it){
   ).join('　')+'</div>';
 }
 
-function viewGather(){
-  return NODES.filter(n=>!n.requires||has(n.requires)).map(n=>{
+function nodeCard(n){
+  {
     const a=accNode(n),cap=capOf(n),step=ms(cdOf(S,n)),full=a.n>=cap;
     const left=full?0:Math.max(0,a.t+step-now());
     const pct=full?100:Math.max(0,Math.min(100,100-left/step*100));
@@ -578,7 +706,31 @@ function viewGather(){
       '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
       '<div class="sub '+(full?'warn':'')+'" style="margin-top:6px">たまり '+a.n+' / '+cap+
       (full?'　満杯。採取するまで増えない':'　次まで '+mmss(left))+'</div></div>';
-  }).join('')+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先が現れる。'+
+  }
+}
+function viewGather(){
+  let h='';
+  AREAS.forEach(a=>{
+    const ns=NODES.filter(n=>n.area===a.id);
+    if(!(a.unlock==='start'||has(a.unlock))){
+      /* まだ行けないエリアも、存在だけは見せておく */
+      h+='<div class="card locked"><div class="row"><div class="ico">'+a.icon+'</div>'+
+         '<div class="grow"><div class="name q">'+a.name+'</div>'+
+         '<div class="hint">'+esc(a.hint)+'</div></div></div></div>';
+      return;
+    }
+    h+='<h2>'+a.icon+' '+a.name+'</h2>';
+    if(!ns.length){
+      /* 集落のように、採取ではなく交易をする場所 */
+      h+='<div class="card sub">ここでは物を採らない。'+
+         '持って行った物と引き換えに、手に入らない物をもらえる（作業タブ）。</div>';
+      return;
+    }
+    const vis=ns.filter(n=>!n.requires||has(n.requires));
+    h+=vis.length?vis.map(nodeCard).join('')
+      :'<div class="card sub">ここで採れる物はまだ扱えない。道具がいる。</div>';
+  });
+  return h+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先が現れる。'+
   '良い道具は待ち時間を縮める。閉じている間も上限までたまる。</div>';
 }
 
@@ -742,7 +894,7 @@ function runSim(){
 function buildWelcome(away){
   if(away<300000)return null;          /* 5分未満なら出さない */
   const rows=[];
-  NODES.filter(n=>!n.requires||has(n.requires)).forEach(n=>{
+  NODES.filter(nodeOpen).forEach(n=>{
     const a=accNode(n);if(a.n>0)rows.push(n.icon+n.name+'×'+a.n);});
   const crop={};
   S.plots.forEach(p=>{if(!p||!p.n)return;const k=CROPS[p.crop]?p.crop:'wheat';
