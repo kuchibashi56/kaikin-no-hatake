@@ -151,6 +151,13 @@ const ITEMS={
   soup:   {name:'野菜スープ',  icon:'🍲',kind:'material'},
   pie:    {name:'木の実のパイ',icon:'🥧',kind:'material'},
   grilled:{name:'焼き魚',      icon:'🍢',kind:'material'},
+  cornbread:{name:'コーンブレッド',icon:'🫓',kind:'material'},
+
+  /* ---- 集落 ---- */
+  fame:  {name:'評判',      icon:'🎖',kind:'material'},
+  steel: {name:'鋼',        icon:'🔗',kind:'material'},
+  cseed: {name:'珍しい種',  icon:'🌰',kind:'material'},
+  corn:  {name:'とうもろこし',icon:'🌽',kind:'material'},
   ore:   {name:'鉱石',  icon:'🧱',kind:'material'},
   iron:  {name:'鉄',    icon:'🔩',kind:'material'},
 
@@ -182,6 +189,12 @@ const ITEMS={
   chicken:  {name:'鶏',      icon:'🐔',kind:'station'},
   goat:     {name:'山羊',    icon:'🐐',kind:'station'},
 
+  /* 住民。顔を覚えてもらうと、その人だけが扱う物を回してくれる。
+     station として持つことで「その人に頼める」を表す */
+  trader:   {name:'行商人',  icon:'🛍',kind:'villager'},
+  smith:    {name:'鍛冶屋',  icon:'🔨',kind:'villager'},
+  herbalist:{name:'薬師',    icon:'🧪',kind:'villager'},
+
   stone_axe:{name:'石の斧',    icon:'🪓',kind:'tool'},
   pickaxe:  {name:'石のツルハシ',icon:'⛏',kind:'tool'},
   iron_axe: {name:'鉄の斧',    icon:'⚒',kind:'tool',
@@ -193,6 +206,11 @@ const ITEMS={
   rod:      {name:'釣竿',        icon:'🎣',kind:'tool'},
   cart:     {name:'荷車',        icon:'🛒',kind:'tool'},
   boat:     {name:'小舟',        icon:'🛶',kind:'tool'},
+  steeltool:{name:'鋼の道具一式',icon:'🧰',kind:'tool',
+             mods:[{k:'cd.ore',mul:0.6},{k:'cd.log',mul:0.8},{k:'cd.stone',mul:0.8}]},
+  charm:    {name:'守り袋',      icon:'🧿',kind:'tool',
+             mods:[{k:'grow.wheat',mul:0.9},{k:'grow.potato',mul:0.9},
+                   {k:'grow.corn',mul:0.9}]},
 };
 
 /* エリア。解禁は got: 条件で見る（材料として消える物を have: で見ると、
@@ -335,10 +353,33 @@ const RECIPES=[
    unlock:['got:goat'],reveal:['got:goat'],hint:'山羊に飼葉と薬草を与えて待つ'},
 
   /* ---- 集落との交易。station なしで、材料を渡して受け取る ---- */
-  {id:'trade_salt',out:{salt:6},inputs:{bread:2,baked:2},station:null,
-   unlock:['got:cart'],reveal:['got:cart'],hint:'集落で食べ物と引き換える'},
-  {id:'trade_spice',out:{spice:3},inputs:{pie:1,jerky:1},station:null,
-   unlock:['got:pie'],reveal:['got:salt'],hint:'集落で、ごちそうと引き換える'},
+  /* 差し入れ。見返りは物ではなく評判で、評判は消えずに積み上がる */
+  {id:'gift_food',out:{fame:2},inputs:{bread:1,baked:1},station:null,
+   unlock:['got:cart'],reveal:['got:cart'],hint:'集落へ差し入れる。顔を覚えてもらう'},
+  {id:'gift_feast',out:{fame:4},inputs:{soup:1,jerky:1},station:null,
+   unlock:['min:fame:3'],reveal:['got:fame'],hint:'もっと良い物を持って行く'},
+
+  /* 住民。評判が足りると、名前を覚えてもらえる */
+  {id:'trader',out:{trader:1},inputs:{bread:2},station:null,
+   unlock:['min:fame:2'],reveal:['got:fame'],hint:'よく来る顔になった'},
+  {id:'smith',out:{smith:1},inputs:{jerky:2,iron:4},station:null,
+   unlock:['min:fame:5'],reveal:['got:trader'],hint:'炉を扱う者に用がある'},
+  {id:'herbalist',out:{herbalist:1},inputs:{cheese:1,herb:4},station:null,
+   unlock:['min:fame:9'],reveal:['got:smith'],hint:'草に詳しい者がいるらしい'},
+
+  /* 住民ごとの扱い物。その人を知っていないと頼めない */
+  {id:'trade_salt',out:{salt:6},inputs:{baked:2},station:['trader'],
+   unlock:['got:trader'],reveal:['got:trader'],hint:'行商人から買う'},
+  {id:'trade_spice',out:{spice:3},inputs:{pie:1,jerky:1},station:['trader'],
+   unlock:['got:trader'],reveal:['got:trader'],hint:'行商人の遠国の品'},
+  {id:'trade_steel',out:{steel:2},inputs:{iron:5,charcoal:3},station:['smith'],time:240,
+   unlock:['got:smith'],reveal:['got:smith'],hint:'鍛冶屋に打ち直してもらう'},
+  {id:'steeltool',out:{steeltool:1},inputs:{steel:4,plank:4},station:['smith'],time:200,
+   unlock:['got:steel'],reveal:['got:steel'],hint:'鋼で揃えた道具'},
+  {id:'trade_seed',out:{cseed:1},inputs:{pie:1,spice:1},station:['herbalist'],
+   unlock:['got:herbalist'],reveal:['got:herbalist'],hint:'見たことのない作物の種'},
+  {id:'charm',out:{charm:1},inputs:{herb:6,cloth:2,spice:1},station:['herbalist'],time:260,
+   unlock:['got:herbalist'],reveal:['got:herbalist'],hint:'畑によく効くという袋'},
 
   /* ---- 料理 ---- */
   {id:'kitchen',out:{kitchen:1},inputs:{brick:6,plank:6,copper:2},station:['workshop'],
@@ -353,15 +394,18 @@ const RECIPES=[
    unlock:['got:egg'],reveal:['got:kitchen'],hint:'木の実を包んで焼いた物'},
   {id:'grilled',out:{grilled:2},inputs:{fish:2,salt:1,herb:1},station:['kitchen'],time:170,
    unlock:['got:fish'],reveal:['got:kitchen'],hint:'獲れた物に火を通す'},
+  {id:'cornbread',out:{cornbread:2},inputs:{corn:3,flour:2,milk:1},station:['kitchen'],time:300,
+   unlock:['got:corn'],reveal:['got:cseed'],hint:'新しい穀物を焼いた物'},
 
-  {id:'frontier',out:{},inputs:{spice:1,cheese:1,grilled:1},station:['workshop'],
-   unlock:['never'],reveal:['got:spice'],hint:'さらに先の何か … まだ作れない'},
+  {id:'frontier',out:{},inputs:{cornbread:2,steel:2,spice:2},station:['workshop'],
+   unlock:['never'],reveal:['got:charm'],hint:'さらに先の何か … まだ作れない'},
 ];
 
 /* unlock: 'start' か flagOk が読める条件。畑に植えられるようになる条件 */
 const CROPS={
   wheat: {name:'麦',        icon:'🌾',seed:'🌱',grow:300,yield:3,unlock:'start'},
   potato:{name:'じゃがいも',icon:'🥔',seed:'🌱',grow:600,yield:5,unlock:'have:shovel'},
+  corn:  {name:'とうもろこし',icon:'🌽',seed:'🌱',grow:600,yield:8,unlock:'have:cseed'},
 };
 
 /* 放置でたまる上限（待ち時間の何回分か）。調整タブで変更できる */
@@ -370,8 +414,8 @@ const CAP_NODE=8, CAP_PLOT=12;
 const CAP_BASE=40, CAP_BOX=40, CAP_VAULT=150, CAP_MAX=999;
 
 /* 任意投資。コストから導けないのでシミュレーター用の方針として与える */
-const POLICY=[{id:'farm',def:3},{id:'furnace',def:2},{id:'crate',def:3},
-  {id:'vault',def:1}];
+const POLICY=[{id:'farm',def:4},{id:'furnace',def:2},{id:'crate',def:3},
+  {id:'vault',def:1},{id:'kitchen',def:2},{id:'chicken',def:2}];
 
 const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待ち時間',
   'cd.log':'大木の待ち時間','cd.ore':'鉱脈の待ち時間','grow.wheat':'麦の成長時間',
@@ -382,6 +426,7 @@ const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待
   'y0.sand':'砂の取得数','y1.sand':'砂の取得数',
   'y0.spring':'水の取得数','y1.spring':'水の取得数',
   'grow.potato':'じゃがいもの成長時間','cy.potato':'じゃがいもの収穫量',
+  'grow.corn':'とうもろこしの成長時間','cy.corn':'とうもろこしの収穫量',
   'time.baked':'芋を焼く時間'};
 
 /* ============================================================
@@ -442,6 +487,9 @@ function flagOk(c,f){
   const i=f.indexOf(':'),k=f.slice(0,i),v=f.slice(i+1);
   if(k==='got') return !!c.flags['got:'+v];
   if(k==='have')return cnt(c,v)>=1;
+  /* min:<item>:<n> — n個以上持っていること。消費はしない */
+  if(k==='min'){const j=v.lastIndexOf(':');
+    return cnt(c,v.slice(0,j))>=(+v.slice(j+1)||1);}
   return false;
 }
 
@@ -591,6 +639,9 @@ function simulate(maxSec=86400){
     targets.forEach(r=>{if(c.made[r.id])return;
       const inp=inputsOf(r);
       for(const k in inp)need(k,inp[k]);
+      r.unlock.forEach(f=>{if(f.indexOf('min:')!==0)return;
+        const v=f.slice(4),j=v.lastIndexOf(':');
+        need(v.slice(0,j),+v.slice(j+1)||1);});
       if(r.station&&!r.station.some(s=>cnt(c,s)>=1))need(r.station[0],1);});
     POLICY.forEach(p=>need(p.id,tv('policy.'+p.id,p.def)));
     for(let pass=0;pass<5;pass++){
@@ -678,11 +729,24 @@ function toast(t){const d=document.createElement('div');d.textContent=t;
   $('toast').appendChild(d);setTimeout(()=>d.remove(),1900);}
 const TAGS={station:'<span class="tag s">作業場</span>',tool:'<span class="tag t">道具</span>',
             plot:'<span class="tag s">区画</span>',storage:'<span class="tag s">収納</span>',
+            villager:'<span class="tag t">住民</span>',
             material:''};
 function costLine(i){return Object.keys(i).map(k=>{
   const need=i[k],have=Math.floor(count(k));
   return '<span class="'+(have<need?'no':'')+'">'+ITEMS[k].icon+ITEMS[k].name+' '+have+'/'+need+'</span>';
 }).join('　');}
+/* min: 条件（消費しないが一定数いる物）の進み具合 */
+function minLine(r){
+  const ms=(r.unlock||[]).filter(f=>f.indexOf('min:')===0);
+  if(!ms.length)return '';
+  return '<div class="cost">'+ms.map(f=>{
+    const v=f.slice(4),j=v.lastIndexOf(':');
+    const id=v.slice(0,j),need=+v.slice(j+1)||1,have=Math.floor(count(id));
+    const it=ITEMS[id];
+    return '<span class="'+(have<need?'no':'')+'">'+(it?it.icon+it.name:id)+
+           ' '+have+'/'+need+'</span>';
+  }).join('　')+'</div>';
+}
 function modLine(it){
   if(!it||!it.mods)return '';
   return '<div class="mod">'+it.mods.map(m=>(MOD_LABEL[m.k]||m.k)+
@@ -816,7 +880,7 @@ function viewCodex(){
       '<div class="cost">'+costLine(inputsOf(r))+'</div>'+modLine(it)+'</div></div></div>';
     return '<div class="card locked"><div class="row"><div class="ico">❔</div>'+
       '<div class="grow"><div class="name q">？？？</div>'+
-      '<div class="hint">'+esc(r.hint)+'</div></div></div></div>';
+      '<div class="hint">'+esc(r.hint)+'</div>'+minLine(r)+'</div></div></div>';
   }).join('')+'<div class="sub" style="margin:4px 2px">'+
   vis.filter(r=>ok(r.unlock)).length+' / '+RECIPES.length+' 解禁</div>';
 }
