@@ -6,7 +6,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14110e">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>解禁の畑 — Tier 2</title>
+<title>解禁の畑 — Tier 3</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -98,7 +98,7 @@
 </head>
 <body>
 <div id="app">
-  <h1>解禁の畑 <small>Tier 2</small></h1>
+  <h1>解禁の畑 <small>Tier 3</small></h1>
   <div class="inv" id="inv"></div>
   <div id="view"></div>
 </div>
@@ -122,17 +122,34 @@ const ITEMS={
   ore:   {name:'鉱石',  icon:'🧱',kind:'material'},
   iron:  {name:'鉄',    icon:'🔩',kind:'material'},
 
+  /* ---- Tier 3 の素材 ---- */
+  sand:    {name:'砂',    icon:'🏜',kind:'material'},
+  water:   {name:'水',    icon:'💧',kind:'material'},
+  charcoal:{name:'木炭',  icon:'⬛',kind:'material'},
+  glass:   {name:'ガラス',icon:'🫙',kind:'material'},
+  clay:    {name:'粘土',  icon:'🟤',kind:'material'},
+  brick:   {name:'レンガ',icon:'🟧',kind:'material'},
+
   workbench:{name:'作業台',  icon:'🛠', kind:'station'},
   mill:     {name:'石臼',    icon:'⚙️',kind:'station'},
   furnace:  {name:'炉',      icon:'🔥',kind:'station'},
   workshop: {name:'複合工房',icon:'🏭',kind:'station'},
   farm:     {name:'畑',      icon:'🟩',kind:'plot'},
   crate:    {name:'収納箱',  icon:'📦',kind:'storage'},
+  vault:    {name:'石蔵',    icon:'🏯',kind:'storage'},
+  bellows:  {name:'ふいご',  icon:'💨',kind:'station',
+             mods:[{k:'time.iron',mul:0.6},{k:'time.charcoal',mul:0.7}]},
+  compost:  {name:'堆肥箱',  icon:'🍂',kind:'station',
+             mods:[{k:'grow.wheat',mul:0.75},{k:'cy.wheat',add:1}]},
 
   stone_axe:{name:'石の斧',    icon:'🪓',kind:'tool'},
   pickaxe:  {name:'石のツルハシ',icon:'⛏',kind:'tool'},
   iron_axe: {name:'鉄の斧',    icon:'⚒',kind:'tool',
              mods:[{k:'cd.log',mul:0.5}]},
+  shovel:   {name:'木のシャベル',icon:'🥄',kind:'tool'},
+  bucket:   {name:'木のバケツ',  icon:'🪣',kind:'tool'},
+  lantern:  {name:'ランタン',    icon:'🏮',kind:'tool',
+             mods:[{k:'cd.ore',mul:0.7},{k:'cd.stone',mul:0.8}]},
 };
 
 const NODES=[
@@ -144,6 +161,10 @@ const NODES=[
    yield:{log:[2,3]},   desc:'斧を持っていないと歯が立たない'},
   {id:'ore',   name:'鉱脈', icon:'🗻',cd:180,requires:'have:pickaxe',
    yield:{ore:[1,2]},   desc:'ツルハシで削り出す'},
+  {id:'sand',  name:'砂地', icon:'🏖',cd:60, requires:'have:shovel',
+   yield:{sand:[2,3]},  desc:'シャベルで掘り返す'},
+  {id:'spring',name:'泉',   icon:'⛲',cd:90, requires:'have:bucket',
+   yield:{water:[1,2]}, desc:'桶で水を汲む'},
 ];
 
 /* station : 1つ以上持っていれば作れる。消費されない
@@ -178,8 +199,30 @@ const RECIPES=[
   {id:'iron_axe',out:{iron_axe:1},inputs:{iron:3,plank:2},station:['workbench','workshop'],
    unlock:['got:iron'],reveal:['got:furnace'],hint:'鉄で打ち直した斧'},
 
-  {id:'frontier',out:{},inputs:{iron:1,bread:1},station:['workshop'],
-   unlock:['never'],reveal:['got:iron_axe'],hint:'未知の素材×1 … まだ作れない'},
+  /* ---- Tier 3 ここから ---- */
+  {id:'shovel',out:{shovel:1},inputs:{plank:2,branch:3},station:['workbench','workshop'],
+   unlock:['got:plank'],reveal:['got:stone_axe'],hint:'土と砂を掘り返す物'},
+  {id:'charcoal',out:{charcoal:1},inputs:{log:1},station:['furnace'],time:90,
+   unlock:['got:furnace'],reveal:['got:furnace'],hint:'丸太をじっくり蒸し焼きにした物'},
+  {id:'bucket',out:{bucket:1},inputs:{plank:3,iron:1},station:['workbench','workshop'],
+   unlock:['got:iron'],reveal:['got:furnace'],hint:'水を汲むための物'},
+  {id:'glass',out:{glass:2},inputs:{sand:4,charcoal:1},station:['furnace'],time:120,
+   unlock:['got:sand'],reveal:['got:sand'],hint:'砂を溶かすと透ける'},
+  {id:'clay',out:{clay:2},inputs:{sand:2,water:1},station:['workbench','workshop'],
+   unlock:['got:water'],reveal:['got:sand'],hint:'砂と水を練った物'},
+  {id:'brick',out:{brick:1},inputs:{clay:2},station:['furnace'],time:110,
+   unlock:['got:clay'],reveal:['got:clay'],hint:'粘土を焼き固めた物'},
+  {id:'lantern',out:{lantern:1},inputs:{glass:2,iron:1,charcoal:1},station:['workbench','workshop'],
+   unlock:['got:glass'],reveal:['got:glass'],hint:'暗い所を照らす物'},
+  {id:'bellows',out:{bellows:1},inputs:{iron:2,plank:4,glass:1},station:['workbench','workshop'],
+   unlock:['got:glass'],reveal:['got:glass'],hint:'炉に風を送る物'},
+  {id:'compost',out:{compost:1},inputs:{plank:4,wheat:10,water:2},station:['workbench','workshop'],
+   unlock:['got:water'],reveal:['got:farm'],hint:'畑に入れると早く育つ物'},
+  {id:'vault',out:{vault:1},inputs:{brick:8,plank:6},station:['workshop'],
+   unlock:['got:brick'],reveal:['got:brick'],hint:'たくさんしまえる、大きな物'},
+
+  {id:'frontier',out:{},inputs:{brick:1,glass:1,bread:1},station:['workshop'],
+   unlock:['never'],reveal:['got:vault'],hint:'さらに先の素材 … まだ作れない'},
 ];
 
 const CROPS={wheat:{name:'麦',icon:'🌾',seed:'🌱',grow:300,yield:3}};
@@ -187,15 +230,20 @@ const CROPS={wheat:{name:'麦',icon:'🌾',seed:'🌱',grow:300,yield:3}};
 /* 放置でたまる上限（待ち時間の何回分か）。調整タブで変更できる */
 const CAP_NODE=8, CAP_PLOT=12;
 /* 素材1種あたりの保管上限。収納箱1つごとに増え、CAP_MAX で頭打ちになる */
-const CAP_BASE=40, CAP_BOX=40, CAP_MAX=999;
+const CAP_BASE=40, CAP_BOX=40, CAP_VAULT=150, CAP_MAX=999;
 
 /* 任意投資。コストから導けないのでシミュレーター用の方針として与える */
-const POLICY=[{id:'farm',def:3},{id:'furnace',def:2},{id:'crate',def:3}];
+const POLICY=[{id:'farm',def:3},{id:'furnace',def:2},{id:'crate',def:3},
+  {id:'vault',def:1}];
 
 const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待ち時間',
   'cd.log':'大木の待ち時間','cd.ore':'鉱脈の待ち時間','grow.wheat':'麦の成長時間',
   'cy.wheat':'麦の収穫量','time.iron':'製鉄時間',
-  'y0.log':'丸太の取得数','y1.log':'丸太の取得数','y0.ore':'鉱石の取得数','y1.ore':'鉱石の取得数'};
+  'y0.log':'丸太の取得数','y1.log':'丸太の取得数','y0.ore':'鉱石の取得数','y1.ore':'鉱石の取得数',
+  'cd.sand':'砂地の待ち時間','cd.spring':'泉の待ち時間',
+  'time.charcoal':'炭を焼く時間','time.glass':'ガラスを焼く時間','time.brick':'レンガを焼く時間',
+  'y0.sand':'砂の取得数','y1.sand':'砂の取得数',
+  'y0.spring':'水の取得数','y1.spring':'水の取得数'};
 
 /* ============================================================
    調整層
@@ -286,7 +334,9 @@ const allOk=(c,l)=>l.every(f=>flagOk(c,f));
 const affordIn=(c,i)=>Object.keys(i).every(k=>cnt(c,k)>=i[k]);
 /* 素材1種あたりの保管上限。収納箱を作ると増える */
 const invCap=c=>Math.min(tv('cap.max',CAP_MAX),
-  tv('cap.base',CAP_BASE)+cnt(c,'crate')*tv('cap.box',CAP_BOX));
+  tv('cap.base',CAP_BASE)
+  +cnt(c,'crate')*tv('cap.box',CAP_BOX)
+  +cnt(c,'vault')*tv('cap.vault',CAP_VAULT));
 const isCapped=id=>!!ITEMS[id]&&ITEMS[id].kind==='material';
 const roomFor=(c,id)=>isCapped(id)?Math.max(0,invCap(c)-cnt(c,id)):Infinity;
 /* 入りきる分だけ渡し、実際に入った数を返す */
@@ -380,13 +430,27 @@ function simulate(maxSec=86400){
   const log=[],actTicks=[];
   const pend=k=>c.jobs.reduce((s,j)=>{const r=RECIPES.find(x=>x.id===j.id);
     return s+((r&&r.out[k])||0);},0);
+  /* 必要数。未達のレシピの材料をたどり、中間素材の需要も伝播させる。
+     これが無いと vault <- レンガ <- 粘土 のような多段の連鎖で、
+     途中の素材が「一度作ったから、もう要らない」と判定されて止まる */
   const requiredQty=()=>{const q={};
+    const need=(k,v)=>{q[k]=Math.max(q[k]||0,v);};
     targets.forEach(r=>{if(c.made[r.id])return;
       const inp=inputsOf(r);
-      for(const k in inp)q[k]=Math.max(q[k]||0,inp[k]);
-      if(r.station&&!r.station.some(s=>cnt(c,s)>=1))
-        q[r.station[0]]=Math.max(q[r.station[0]]||0,1);});
-    POLICY.forEach(p=>{q[p.id]=Math.max(q[p.id]||0,tv('policy.'+p.id,p.def));});
+      for(const k in inp)need(k,inp[k]);
+      if(r.station&&!r.station.some(s=>cnt(c,s)>=1))need(r.station[0],1);});
+    POLICY.forEach(p=>need(p.id,tv('policy.'+p.id,p.def)));
+    for(let pass=0;pass<5;pass++){
+      Object.keys(q).forEach(k=>{
+        const short=q[k]-cnt(c,k)-pend(k);
+        if(short<=0)return;
+        const src=targets.find(r=>r.out[k]);     /* 採取物は作り方が無いので止まる */
+        if(!src)return;
+        const runs=Math.min(30,Math.ceil(short/src.out[k]));
+        const inp=inputsOf(src);
+        for(const j in inp)need(j,inp[j]*runs);
+      });
+    }
     return q;};
 
   for(let t=0;t<=maxSec;t++){
@@ -483,7 +547,8 @@ function viewGather(){
 
 function viewCraft(){
   let h='<div class="sub" style="margin:4px 2px">📦 置ける量 素材1種あたり '+invCap(S)+
-    '（収納箱 '+Math.floor(count('crate'))+'個）</div>';
+    '（収納箱 '+Math.floor(count('crate'))+'個 / 石蔵 '+
+    Math.floor(count('vault'))+'個）</div>';
   if(S.jobs.length){
     h+='<h2 style="margin-top:8px">稼働中</h2>';
     h+=S.jobs.map((j,i)=>{
@@ -588,10 +653,13 @@ function viewTune(){
      num('cap.base',CAP_BASE,'個')+'</div>'+
      '<div class="tr"><div class="tl">　└ 収納箱1つあたりの増加</div>'+
      num('cap.box',CAP_BOX,'個')+'</div>'+
+     '<div class="tr"><div class="tl">　└ 石蔵1つあたりの増加</div>'+
+     num('cap.vault',CAP_VAULT,'個')+'</div>'+
      '<div class="tr"><div class="tl">　└ ここで頭打ち</div>'+
      num('cap.max',CAP_MAX,'個')+'</div>'+
      '<div class="sub" style="margin-top:6px">いまの値 '+invCap(S)+
-     '　収納箱 '+Math.floor(count('crate'))+'個</div>';
+     '　収納箱 '+Math.floor(count('crate'))+'個　石蔵 '+
+     Math.floor(count('vault'))+'個</div>';
   h+='</div><div class="card"><h2 style="margin-top:0">解禁の間隔</h2>';
   POLICY.forEach(p=>{h+='<div class="tr"><div class="tl">測定方針：'+ITEMS[p.id].name+'をいくつ建てるか</div>'+
     num('policy.'+p.id,p.def,'個')+'</div>';});
