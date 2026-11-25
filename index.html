@@ -177,6 +177,9 @@ const RECIPES=[
 
 const CROPS={wheat:{name:'麦',icon:'🌾',seed:'🌱',grow:300,yield:3}};
 
+/* 放置でたまる上限（待ち時間の何回分か）。調整タブで変更できる */
+const CAP_NODE=8, CAP_PLOT=12;
+
 /* 任意投資。コストから導けないのでシミュレーター用の方針として与える */
 const POLICY=[{id:'farm',def:3},{id:'furnace',def:2}];
 
@@ -189,12 +192,18 @@ const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待
    調整層
    ============================================================ */
 const KEY='kuchibashi-craft-v3';
-const fresh=()=>({inv:{},flags:{},ready:{},plots:[],jobs:[],scale:1,tune:{}});
+const fresh=()=>({inv:{},flags:{},acc:{},plots:[],jobs:[],scale:1,tune:{},lastSeen:0});
 let S=fresh();
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(fresh(),JSON.parse(r));}catch(e){}
 if(!S.tune)S.tune={};
 if(!S.jobs)S.jobs=[];
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+if(!S.acc)S.acc={};
+/* 旧セーブからの移行。ready{} は捨て、plots を {at,n} 形式にそろえる */
+if(S.ready)delete S.ready;
+S.plots=(S.plots||[]).map(p=>p?{crop:'wheat',at:(p.at||Date.now()),n:(p.n||0)}:null);
+/* 不在時間。蓄積を進める前に測る */
+const AWAY=Math.max(0,Date.now()-(S.lastSeen||Date.now()));
+const save=()=>{try{S.lastSeen=Date.now();localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
 const tv=(k,def)=>{const v=S.tune[k];return(v===undefined||v===''||isNaN(v))?def:+v;};
 
 /* ============================================================
@@ -217,12 +226,38 @@ function eff(c,key,base,min){
   return Math.max(min===undefined?0:min,Math.round((v+add)*mul));
 }
 const cdOf=(c,n)=>eff(c,'cd.'+n.id,n.cd,1);
+const capOf=n=>Math.max(1,Math.round(tv('cap.'+n.id,CAP_NODE)));
+const plotCap=()=>Math.max(1,Math.round(tv('cap.plot',CAP_PLOT)));
 const yldOf=(c,n)=>{const o={};for(const k in n.yield)
   o[k]=[eff(c,'y0.'+n.id,n.yield[k][0],0),eff(c,'y1.'+n.id,n.yield[k][1],0)];return o;};
 const growOf=c=>eff(c,'grow.wheat',CROPS.wheat.grow,1);
 const cropYield=c=>eff(c,'cy.wheat',CROPS.wheat.yield,0);
 const timeOf=(c,r)=>r.time?eff(c,'time.'+r.id,r.time,1):0;
 const inputsOf=r=>{const o={};for(const k in r.inputs)o[k]=tv('in.'+r.id+'.'+k,r.inputs[k]);return o;};
+
+/* --- 放置の蓄積。閉じている間の経過を、開いた時にまとめて精算する --- */
+function accNode(node){
+  const a=S.acc[node.id]||(S.acc[node.id]={n:0,t:now()});
+  const step=ms(cdOf(S,node)),cap=capOf(node);
+  if(step>0&&now()>a.t){
+    const g=Math.floor((now()-a.t)/step);
+    if(g>0){a.n=Math.min(cap,a.n+g);a.t+=g*step;}
+  }
+  if(a.n>=cap)a.t=now();   /* 満杯の間は時間を進めない */
+  return a;
+}
+function accPlot(p){
+  if(!p)return null;
+  const step=ms(growOf(S)),cap=plotCap();
+  if(p.n===undefined)p.n=0;
+  if(step>0&&now()>p.at){
+    const g=Math.floor((now()-p.at)/step);
+    if(g>0){p.n=Math.min(cap,p.n+g);p.at+=g*step;}
+  }
+  if(p.n>=cap)p.at=now();
+  return p;
+}
+function accrueAll(){NODES.forEach(accNode);S.plots.forEach(accPlot);}
 
 function flagOk(c,f){
   if(f==='start')return true;
@@ -252,14 +287,17 @@ function syncPlots(){
   const n=Math.floor(count('farm'));
   while(S.plots.length<n)S.plots.push(null);
   while(S.plots.length>n)S.plots.pop();
+  S.plots.forEach(accPlot);
 }
 function gather(node){
-  if(now()<(S.ready[node.id]||0))return;
-  const y=yldOf(S,node),got=[];
-  for(const k in y){const[a,b]=y[k];
-    const n=a+Math.floor(Math.random()*(Math.max(a,b)-a+1));
-    giveIn(S,k,n);got.push(ITEMS[k].icon+ITEMS[k].name+'×'+n);}
-  S.ready[node.id]=now()+ms(cdOf(S,node));
+  const a=accNode(node);
+  if(a.n<1)return;
+  const y=yldOf(S,node),tot={};
+  for(let i=0;i<a.n;i++)for(const k in y){const[lo,hi]=y[k];
+    tot[k]=(tot[k]||0)+lo+Math.floor(Math.random()*(Math.max(lo,hi)-lo+1));}
+  const got=[];
+  for(const k in tot){giveIn(S,k,tot[k]);got.push(ITEMS[k].icon+ITEMS[k].name+'×'+tot[k]);}
+  a.n=0;a.t=now();
   toast(got.join(' / '));save();render();
 }
 function craft(r){
@@ -283,9 +321,10 @@ function collect(i){
   for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
   S.jobs.splice(i,1);toast(names.join(' / '));save();render();
 }
-function plant(i){S.plots[i]={crop:'wheat',at:now()};save();render();}
-function harvest(i){const p=S.plots[i];const n=cropYield(S);giveIn(S,p.crop,n);
-  S.plots[i]=null;toast('🌾麦×'+n);save();render();}
+function plant(i){S.plots[i]={crop:'wheat',at:now(),n:0};save();render();}
+function harvest(i){const p=accPlot(S.plots[i]);if(!p||p.n<1)return;
+  const n=p.n*cropYield(S);giveIn(S,'wheat',n);
+  p.n=0;p.at=now();toast('🌾麦×'+n);save();render();}
 
 /* ============================================================
    シミュレーター
@@ -356,7 +395,7 @@ function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
 /* ============================================================
    表示層
    ============================================================ */
-let tab='gather';
+let tab='gather',WELCOME=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const mmss=m=>{const s=Math.max(0,Math.ceil(m/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -378,18 +417,22 @@ function modLine(it){
 
 function viewGather(){
   return NODES.filter(n=>!n.requires||has(n.requires)).map(n=>{
-    const left=(S.ready[n.id]||0)-now(),busy=left>0;
-    const pct=busy?100-left/ms(cdOf(S,n))*100:100;
+    const a=accNode(n),cap=capOf(n),step=ms(cdOf(S,n)),full=a.n>=cap;
+    const left=full?0:Math.max(0,a.t+step-now());
+    const pct=full?100:Math.max(0,Math.min(100,100-left/step*100));
     const base=tv('cd.'+n.id,n.cd),real=cdOf(S,n);
-    return '<div class="card"><div class="row"><div class="ico">'+n.icon+'</div>'+
+    return '<div class="card'+(a.n?' run':'')+'"><div class="row"><div class="ico">'+n.icon+'</div>'+
       '<div class="grow"><div class="name">'+n.name+
-      (real<base?'<span class="tag t">短縮 '+real+'秒</span>':'')+'</div>'+
+      (real<base?'<span class="tag t">短縮 '+real+'秒</span>':'')+
+      (full?'<span class="tag s">満杯</span>':'')+'</div>'+
       '<div class="sub">'+n.desc+'</div></div>'+
-      '<button onclick="gather(NODES.find(x=>x.id===\''+n.id+'\'))"'+(busy?' disabled':'')+'>'+
-      (busy?mmss(left):'採取')+'</button></div>'+
-      '<div class="bar"><i style="width:'+pct+'%"></i></div></div>';
+      '<button onclick="gather(NODES.find(x=>x.id===\''+n.id+'\'))"'+(a.n<1?' disabled':'')+'>'+
+      (a.n<1?mmss(left):'採取 ×'+a.n)+'</button></div>'+
+      '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+      '<div class="sub '+(full?'warn':'')+'" style="margin-top:6px">たまり '+a.n+' / '+cap+
+      (full?'　満杯。採取するまで増えない':'　次まで '+mmss(left))+'</div></div>';
   }).join('')+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先が現れる。'+
-  '良い道具は待ち時間を縮める。</div>';
+  '良い道具は待ち時間を縮める。閉じている間も上限までたまる。</div>';
 }
 
 function viewCraft(){
@@ -434,16 +477,18 @@ function viewFarm(){
   syncPlots();
   if(!S.plots.length)return '<div class="card sub">畑がまだない。板材×4 と 石×3 で作れる。'+
     '畑を追加で作れば区画が増える。</div>';
-  const c=CROPS.wheat;
+  const c=CROPS.wheat,cap=plotCap(),step=ms(growOf(S));
   return '<div class="plots">'+S.plots.map((p,i)=>{
     if(!p)return '<div class="plot"><div class="pi">🟫</div><div class="pt">空き</div>'+
       '<button onclick="plant('+i+')">植える</button></div>';
-    const left=p.at+ms(growOf(S))-now(),done=left<=0;
-    return '<div class="plot"><div class="pi">'+(done?c.icon:c.seed)+'</div>'+
-      '<div class="pt">'+(done?'収穫可':mmss(left))+'</div>'+
-      '<button onclick="harvest('+i+')"'+(done?'':' disabled')+'>'+(done?'収穫':'育成中')+'</button></div>';
+    const full=p.n>=cap,left=full?0:Math.max(0,p.at+step-now());
+    return '<div class="plot"><div class="pi">'+(p.n?c.icon:c.seed)+'</div>'+
+      '<div class="pt'+(full?' warn':'')+'">'+(p.n?p.n+' / '+cap+'回':mmss(left))+'</div>'+
+      '<button onclick="harvest('+i+')"'+(p.n?'':' disabled')+'>'+
+      (p.n?'収穫 ×'+(p.n*cropYield(S)):'育成中')+'</button></div>';
   }).join('')+'</div><div class="sub" style="margin:8px 2px">区画 '+S.plots.length+
-  ' ／ 麦は '+Math.round(growOf(S)/60)+'分で育つ。アプリを閉じていても進む。</div>';
+  ' ／ 麦は '+dur(growOf(S))+'で育ち、収穫しなくても '+cap+'回分（約'+
+  dur(growOf(S)*cap)+'）までたまる。一度植えれば植え直しはいらない。</div>';
 }
 
 function viewCodex(){
@@ -471,10 +516,14 @@ function viewTune(){
   NODES.forEach(n=>{const k=Object.keys(n.yield)[0];
     h+='<div class="tr"><div class="tl">'+n.icon+' '+n.name+' 待ち時間</div>'+num('cd.'+n.id,n.cd,'秒')+'</div>'+
        '<div class="tr"><div class="tl">　└ 取得数 最小／最大</div>'+
-       num('y0.'+n.id,n.yield[k][0],'')+num('y1.'+n.id,n.yield[k][1],'個')+'</div>';});
+       num('y0.'+n.id,n.yield[k][0],'')+num('y1.'+n.id,n.yield[k][1],'個')+'</div>'+
+       '<div class="tr"><div class="tl">　└ 放置でたまる上限（約'+
+       dur(cdOf(S,n)*capOf(n))+'で満杯）</div>'+num('cap.'+n.id,CAP_NODE,'回')+'</div>';});
   h+='</div><div class="card"><h2 style="margin-top:0">作物</h2>'+
      '<div class="tr"><div class="tl">🌾 麦 成長時間</div>'+num('grow.wheat',CROPS.wheat.grow,'秒')+'</div>'+
-     '<div class="tr"><div class="tl">　└ 1区画の収穫量</div>'+num('cy.wheat',CROPS.wheat.yield,'個')+'</div></div>';
+     '<div class="tr"><div class="tl">　└ 1区画の収穫量</div>'+num('cy.wheat',CROPS.wheat.yield,'個')+'</div>'+
+     '<div class="tr"><div class="tl">　└ 収穫待ちの上限（約'+dur(growOf(S)*plotCap())+
+     'で満杯）</div>'+num('cap.plot',CAP_PLOT,'回')+'</div></div>';
 
   h+='<div class="card"><h2 style="margin-top:0">加工時間</h2>';
   RECIPES.filter(r=>r.time).forEach(r=>{const it=ITEMS[Object.keys(r.out)[0]];
@@ -511,6 +560,28 @@ function runSim(){
      '<div class="sub" style="color:#6f655a">※平均値・全操作を即実行する理想プレイでの計算</div>';
   el.innerHTML=h;
 }
+/* 不在中にたまった物をまとめて知らせる */
+function buildWelcome(away){
+  if(away<300000)return null;          /* 5分未満なら出さない */
+  const rows=[];
+  NODES.filter(n=>!n.requires||has(n.requires)).forEach(n=>{
+    const a=accNode(n);if(a.n>0)rows.push(n.icon+n.name+'×'+a.n);});
+  let w=0;S.plots.forEach(p=>{if(p)w+=(p.n||0)*cropYield(S);});
+  if(w>0)rows.push('🌾麦×'+w);
+  const dn=S.jobs.filter(j=>now()>=j.done).length;
+  if(dn>0)rows.push('🔥加工×'+dn+'（完成）');
+  return rows.length?{away:away,rows:rows}:null;
+}
+function dismissWelcome(){WELCOME=null;render();}
+function welcomeHtml(){
+  if(!WELCOME)return '';
+  return '<div class="card run"><div class="row"><div class="ico">👋</div>'+
+    '<div class="grow"><div class="name">おかえり</div><div class="sub">'+
+    dur(Math.round(WELCOME.away/1000))+'ぶり。受け取れる物がたまっている。</div></div>'+
+    '<button class="ghost" onclick="dismissWelcome()">閉じる</button></div>'+
+    '<div class="sub" style="margin-top:8px">'+WELCOME.rows.join('　/　')+'</div></div>';
+}
+
 const TABS=[
   {id:'gather',label:'採取',icon:'🌳',view:viewGather},
   {id:'craft', label:'作業',icon:'🛠',view:viewCraft},
@@ -525,7 +596,7 @@ function render(){
     ? held.map(k=>'<div class="chip'+(ITEMS[k].kind==='material'?'':' st')+'">'+
         ITEMS[k].icon+' <b>'+Math.floor(count(k))+'</b></div>').join('')
     : '<div class="empty">持ち物なし。採取から始める。</div>';
-  $('view').innerHTML=TABS.find(x=>x.id===tab).view()+
+  $('view').innerHTML=(tab==='tune'?'':welcomeHtml())+TABS.find(x=>x.id===tab).view()+
     (tab==='tune'?'':'<div class="dev">開発用 時間倍率'+
       '<button class="ghost" onclick="setScale(1)">×1</button>'+
       '<button class="ghost" onclick="setScale(60)">×60</button>'+
@@ -538,8 +609,12 @@ function render(){
 function go(id){tab=id;render();}
 function setScale(n){S.scale=n;save();render();}
 function reset(){const t=S.tune;S=fresh();S.tune=t;save();tab='gather';render();}
+accrueAll();
+WELCOME=buildWelcome(AWAY);
+save();
 render();
-setInterval(()=>{if(tab!=='tune')render();},500);
+let tick=0;
+setInterval(()=>{accrueAll();if(++tick%20===0)save();if(tab!=='tune')render();},500);
 if('serviceWorker' in navigator){window.addEventListener('load',function(){try{navigator.serviceWorker.register('sw.js').catch(function(){});}catch(e){}});}
 </script>
 </body>

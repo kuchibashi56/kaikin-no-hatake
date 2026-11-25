@@ -1,6 +1,6 @@
 /* 解禁の畑 — service worker
    ゲームを更新したら CACHE の版番号を上げる (kaikin-v1 -> kaikin-v2) */
-const CACHE = 'kaikin-v1';
+const CACHE = 'kaikin-v2';
 const ASSETS = [
   './',
   './index.html',
