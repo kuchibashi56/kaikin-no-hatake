@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<title>解禁の畑 — Tier 2</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:#14110e;color:#e8e0d4;
+    font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  #app{max-width:480px;margin:0 auto;padding:0 12px 96px}
+  h1{font-size:15px;letter-spacing:.08em;margin:14px 2px 10px;color:#c9a227;font-weight:700}
+  h1 small{color:#6f655a;font-weight:400;letter-spacing:0;margin-left:6px}
+  h2{font-size:12px;letter-spacing:.1em;color:#8d8275;margin:18px 2px 8px;font-weight:700}
+
+  .inv{display:flex;gap:6px;overflow-x:auto;padding:8px 2px;scrollbar-width:none}
+  .inv::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;background:#201b16;border:1px solid #2e2720;border-radius:10px;
+        padding:6px 10px;font-size:13px;white-space:nowrap}
+  .chip.st{border-color:#4a3f28}
+  .chip b{font-variant-numeric:tabular-nums}
+  .inv .empty{color:#6f655a;font-size:13px;padding:6px 2px}
+
+  .card{background:#201b16;border:1px solid #2e2720;border-radius:14px;padding:12px;margin-bottom:10px}
+  .card.run{border-color:#4a3f28;background:#241d14}
+  .row{display:flex;align-items:center;gap:10px}
+  .ico{font-size:26px;width:34px;text-align:center;flex:0 0 auto}
+  .name{font-weight:600}
+  .sub{color:#8d8275;font-size:12.5px;margin-top:2px}
+  .grow{flex:1;min-width:0}
+
+  button{font:inherit;font-weight:600;border:none;border-radius:10px;padding:9px 14px;
+    background:#6b8f3f;color:#0f0d0b;cursor:pointer;flex:0 0 auto}
+  button:disabled{background:#2a241e;color:#6f655a}
+  button.alt{background:#c9a227}
+  button.ghost{background:transparent;border:1px solid #3a322a;color:#a89c8c;font-weight:500}
+
+  .bar{height:4px;background:#2a241e;border-radius:3px;margin-top:9px;overflow:hidden}
+  .bar i{display:block;height:100%;background:#6b8f3f;border-radius:3px}
+  .bar.gold i{background:#c9a227}
+
+  .plots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .plot{background:#201b16;border:1px solid #2e2720;border-radius:12px;padding:10px 6px;text-align:center}
+  .plot .pi{font-size:24px;line-height:1.3}
+  .plot .pt{font-size:11px;color:#8d8275;font-variant-numeric:tabular-nums;min-height:15px}
+  .plot button{width:100%;padding:6px 0;font-size:12.5px;margin-top:6px}
+
+  .locked{opacity:.75}
+  .q{color:#6f655a;font-weight:700;letter-spacing:.1em}
+  .hint{color:#8d8275;font-size:12.5px;margin-top:2px;font-style:italic}
+  .tag{display:inline-block;font-size:11px;border:1px solid #3a322a;color:#8d8275;
+       border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}
+  .tag.s{color:#c9a227;border-color:#4a3f28}
+  .tag.t{color:#7fa3c4;border-color:#2f4454}
+  .cost{font-size:12.5px;color:#8d8275;margin-top:4px}
+  .cost .no{color:#c4604a}
+  .need{font-size:12px;color:#c4604a;margin-top:3px}
+  .mod{font-size:12px;color:#7fa3c4;margin-top:3px}
+
+  .tr{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #2a241e}
+  .tr:last-child{border-bottom:none}
+  .tr .tl{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tr .tu{color:#6f655a;font-size:11.5px;flex:0 0 auto}
+  input[type=number]{width:58px;flex:0 0 auto;background:#14110e;border:1px solid #3a322a;
+    color:#e8e0d4;border-radius:8px;padding:7px 8px;font:inherit;font-size:14px;
+    text-align:right;font-variant-numeric:tabular-nums}
+  input[type=number]:focus{outline:none;border-color:#c9a227}
+  .ladder{font-variant-numeric:tabular-nums;font-size:13.5px}
+  .ladder div{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #2a241e}
+  .ladder div:last-child{border-bottom:none}
+  .ladder .lt{color:#c9a227;width:64px;flex:0 0 auto;text-align:right;font-weight:600}
+  .ladder .ld{color:#6f655a;width:52px;flex:0 0 auto;text-align:right}
+  .warn{color:#c4604a}
+  .good{color:#6b8f3f}
+
+  nav{position:fixed;bottom:0;left:0;right:0;background:#1a1612;border-top:1px solid #2e2720;
+      display:flex;padding:6px 0 10px;z-index:5}
+  nav button{flex:1;background:none;color:#6f655a;font-size:11.5px;font-weight:600;padding:6px 0;border-radius:0}
+  nav button.on{color:#c9a227}
+  nav button .nv{display:block;font-size:19px;line-height:1.2;filter:grayscale(1) opacity(.5)}
+  nav button.on .nv{filter:none}
+
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:9;
+         display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  #toast div{background:#2e2720;border:1px solid #42392f;font-size:13px;
+             padding:7px 14px;border-radius:999px;animation:pop .25s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}}
+  .dev{display:flex;align-items:center;gap:8px;margin:14px 2px 0;color:#6f655a;font-size:12px}
+  .dev button{padding:5px 10px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>解禁の畑 <small>Tier 2</small></h1>
+  <div class="inv" id="inv"></div>
+  <div id="view"></div>
+</div>
+<nav id="nav"></nav>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   データ層
+   kind     : material / tool / station / plot
+   mods     : 持っているだけで効く補正。mul=倍率 add=加算
+   ============================================================ */
+const ITEMS={
+  branch:{name:'枝',    icon:'🌿',kind:'material'},
+  stone: {name:'石',    icon:'🪨',kind:'material'},
+  log:   {name:'丸太',  icon:'🪵',kind:'material'},
+  plank: {name:'板材',  icon:'🟫',kind:'material'},
+  wheat: {name:'麦',    icon:'🌾',kind:'material'},
+  flour: {name:'小麦粉',icon:'🏺',kind:'material'},
+  bread: {name:'パン',  icon:'🍞',kind:'material'},
+  ore:   {name:'鉱石',  icon:'🧱',kind:'material'},
+  iron:  {name:'鉄',    icon:'🔩',kind:'material'},
+
+  workbench:{name:'作業台',  icon:'🛠', kind:'station'},
+  mill:     {name:'石臼',    icon:'⚙️',kind:'station'},
+  furnace:  {name:'炉',      icon:'🔥',kind:'station'},
+  workshop: {name:'複合工房',icon:'🏭',kind:'station'},
+  farm:     {name:'畑',      icon:'🟩',kind:'plot'},
+
+  stone_axe:{name:'石の斧',    icon:'🪓',kind:'tool'},
+  pickaxe:  {name:'石のツルハシ',icon:'⛏',kind:'tool'},
+  iron_axe: {name:'鉄の斧',    icon:'⚒',kind:'tool',
+             mods:[{k:'cd.log',mul:0.5}]},
+};
+
+const NODES=[
+  {id:'branch',name:'低木', icon:'🌳',cd:30, requires:null,
+   yield:{branch:[2,3]},desc:'素手で枝を折る'},
+  {id:'stone', name:'石ころ',icon:'⛰', cd:45, requires:null,
+   yield:{stone:[1,2]}, desc:'地面から拾う'},
+  {id:'log',   name:'大木', icon:'🌲',cd:120,requires:'have:stone_axe',
+   yield:{log:[2,3]},   desc:'斧を持っていないと歯が立たない'},
+  {id:'ore',   name:'鉱脈', icon:'🗻',cd:180,requires:'have:pickaxe',
+   yield:{ore:[1,2]},   desc:'ツルハシで削り出す'},
+];
+
+/* station : 1つ以上持っていれば作れる。消費されない
+   time    : 秒。入れると「投入して待つ」加工になる（並列数＝設備の個数） */
+const RECIPES=[
+  {id:'workbench',out:{workbench:1},inputs:{branch:4,stone:2},station:null,
+   unlock:['start'],reveal:['start'],hint:'拾った物を組み合わせる台'},
+  {id:'stone_axe',out:{stone_axe:1},inputs:{branch:6,stone:3},station:['workbench','workshop'],
+   unlock:['got:workbench'],reveal:['start'],hint:'枝と石でできる、何か'},
+  {id:'plank',out:{plank:2},inputs:{log:1},station:['workbench','workshop'],
+   unlock:['got:stone_axe'],reveal:['got:workbench'],hint:'丸太を割ると2つ取れる物'},
+  {id:'farm',out:{farm:1},inputs:{plank:4,stone:3},station:['workbench','workshop'],
+   unlock:['got:plank'],reveal:['got:stone_axe'],hint:'板材×4 と 石×3'},
+  {id:'mill',out:{mill:1},inputs:{wheat:12,plank:6},station:['workbench','workshop'],
+   unlock:['got:wheat'],reveal:['got:farm'],hint:'麦×12 と 板材×6'},
+  {id:'flour',out:{flour:1},inputs:{wheat:4},station:['mill','workshop'],
+   unlock:['got:mill'],reveal:['got:mill'],hint:'麦を挽いた物'},
+  {id:'bread',out:{bread:1},inputs:{flour:3},station:['mill','workshop'],
+   unlock:['got:flour'],reveal:['got:mill'],hint:'小麦粉を使う何か'},
+  {id:'workshop',out:{workshop:1},inputs:{workbench:1,mill:1,plank:6},station:['workbench'],
+   unlock:['got:bread'],reveal:['got:mill'],hint:'設備を2つ食う、大きな何か'},
+
+  /* ---- Tier 2 ここから ---- */
+  {id:'pickaxe',out:{pickaxe:1},inputs:{branch:4,stone:4},station:['workbench','workshop'],
+   unlock:['got:plank'],reveal:['got:stone_axe'],hint:'斧とは別の、削る道具'},
+  {id:'furnace',out:{furnace:1},inputs:{stone:8,plank:2},station:['workbench','workshop'],
+   unlock:['got:ore'],reveal:['got:pickaxe'],hint:'石×8 と 板材×2'},
+  {id:'iron',out:{iron:1},inputs:{ore:2,branch:3},station:['furnace'],time:120,
+   unlock:['got:furnace'],reveal:['got:furnace'],hint:'鉱石を燃やして得る物'},
+  {id:'iron_axe',out:{iron_axe:1},inputs:{iron:3,plank:2},station:['workbench','workshop'],
+   unlock:['got:iron'],reveal:['got:furnace'],hint:'鉄で打ち直した斧'},
+
+  {id:'frontier',out:{},inputs:{iron:1,bread:1},station:['workshop'],
+   unlock:['never'],reveal:['got:iron_axe'],hint:'未知の素材×1 … まだ作れない'},
+];
+
+const CROPS={wheat:{name:'麦',icon:'🌾',seed:'🌱',grow:300,yield:3}};
+
+/* 任意投資。コストから導けないのでシミュレーター用の方針として与える */
+const POLICY=[{id:'farm',def:3},{id:'furnace',def:2}];
+
+const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待ち時間',
+  'cd.log':'大木の待ち時間','cd.ore':'鉱脈の待ち時間','grow.wheat':'麦の成長時間',
+  'cy.wheat':'麦の収穫量','time.iron':'製鉄時間',
+  'y0.log':'丸太の取得数','y1.log':'丸太の取得数','y0.ore':'鉱石の取得数','y1.ore':'鉱石の取得数'};
+
+/* ============================================================
+   調整層
+   ============================================================ */
+const KEY='kuchibashi-craft-v3';
+const fresh=()=>({inv:{},flags:{},ready:{},plots:[],jobs:[],scale:1,tune:{}});
+let S=fresh();
+try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(fresh(),JSON.parse(r));}catch(e){}
+if(!S.tune)S.tune={};
+if(!S.jobs)S.jobs=[];
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+const tv=(k,def)=>{const v=S.tune[k];return(v===undefined||v===''||isNaN(v))?def:+v;};
+
+/* ============================================================
+   エンジン層 — ctx = {inv, flags, ...}。本体もシミュレーターも同じ
+   ============================================================ */
+const now=()=>Date.now();
+const ms=sec=>sec*1000/S.scale;
+const cnt=(c,id)=>c.inv[id]||0;
+
+/* 調整値を土台に、持っている道具の補正を重ねた実効値 */
+function eff(c,key,base,min){
+  let v=tv(key,base),add=0,mul=1;
+  for(const id in ITEMS){
+    const it=ITEMS[id];
+    if(!it.mods||cnt(c,id)<1)continue;
+    it.mods.forEach(m=>{if(m.k!==key)return;
+      if(m.mul!==undefined)mul*=m.mul;
+      if(m.add!==undefined)add+=m.add;});
+  }
+  return Math.max(min===undefined?0:min,Math.round((v+add)*mul));
+}
+const cdOf=(c,n)=>eff(c,'cd.'+n.id,n.cd,1);
+const yldOf=(c,n)=>{const o={};for(const k in n.yield)
+  o[k]=[eff(c,'y0.'+n.id,n.yield[k][0],0),eff(c,'y1.'+n.id,n.yield[k][1],0)];return o;};
+const growOf=c=>eff(c,'grow.wheat',CROPS.wheat.grow,1);
+const cropYield=c=>eff(c,'cy.wheat',CROPS.wheat.yield,0);
+const timeOf=(c,r)=>r.time?eff(c,'time.'+r.id,r.time,1):0;
+const inputsOf=r=>{const o={};for(const k in r.inputs)o[k]=tv('in.'+r.id+'.'+k,r.inputs[k]);return o;};
+
+function flagOk(c,f){
+  if(f==='start')return true;
+  if(f==='never')return false;
+  const i=f.indexOf(':'),k=f.slice(0,i),v=f.slice(i+1);
+  if(k==='got') return !!c.flags['got:'+v];
+  if(k==='have')return cnt(c,v)>=1;
+  return false;
+}
+const allOk=(c,l)=>l.every(f=>flagOk(c,f));
+const affordIn=(c,i)=>Object.keys(i).every(k=>cnt(c,k)>=i[k]);
+function giveIn(c,id,n){if(n<=0)return;c.inv[id]=cnt(c,id)+n;c.flags['got:'+id]=1;}
+const stationFor=(c,r)=>r.station?(r.station.find(s=>cnt(c,s)>=1)||null):null;
+const stationOk=(c,r)=>!r.station||!!stationFor(c,r);
+const busyAt=(c,s)=>(c.jobs||[]).filter(j=>j.station===s).length;
+function slotOk(c,r){
+  if(!r.time)return true;
+  const s=stationFor(c,r);
+  return !!s&&busyAt(c,s)<cnt(c,s);
+}
+
+/* --- 本体 --- */
+const count=id=>cnt(S,id);
+const has=f=>flagOk(S,f);
+const ok=l=>allOk(S,l);
+function syncPlots(){
+  const n=Math.floor(count('farm'));
+  while(S.plots.length<n)S.plots.push(null);
+  while(S.plots.length>n)S.plots.pop();
+}
+function gather(node){
+  if(now()<(S.ready[node.id]||0))return;
+  const y=yldOf(S,node),got=[];
+  for(const k in y){const[a,b]=y[k];
+    const n=a+Math.floor(Math.random()*(Math.max(a,b)-a+1));
+    giveIn(S,k,n);got.push(ITEMS[k].icon+ITEMS[k].name+'×'+n);}
+  S.ready[node.id]=now()+ms(cdOf(S,node));
+  toast(got.join(' / '));save();render();
+}
+function craft(r){
+  const inp=inputsOf(r);
+  if(!ok(r.unlock)||!stationOk(S,r)||!affordIn(S,inp)||!slotOk(S,r))return;
+  for(const k in inp)S.inv[k]=count(k)-inp[k];
+  if(r.time){
+    S.jobs.push({id:r.id,station:stationFor(S,r),done:now()+ms(timeOf(S,r))});
+    toast('🔥 投入した');
+  }else{
+    const names=[];
+    for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
+    const first=ITEMS[Object.keys(r.out)[0]];
+    toast((first&&first.kind==='material'?'':'🎉 ')+names.join(' / '));
+  }
+  syncPlots();save();render();
+}
+function collect(i){
+  const j=S.jobs[i];if(!j||now()<j.done)return;
+  const r=RECIPES.find(x=>x.id===j.id),names=[];
+  for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
+  S.jobs.splice(i,1);toast(names.join(' / '));save();render();
+}
+function plant(i){S.plots[i]={crop:'wheat',at:now()};save();render();}
+function harvest(i){const p=S.plots[i];const n=cropYield(S);giveIn(S,p.crop,n);
+  S.plots[i]=null;toast('🌾麦×'+n);save();render();}
+
+/* ============================================================
+   シミュレーター
+   ============================================================ */
+function simulate(maxSec=86400){
+  const c={inv:{},flags:{},ready:{},plots:[],jobs:[],made:{},started:{}};
+  const targets=RECIPES.filter(r=>!r.unlock.includes('never'));
+  const log=[],actTicks=[];
+  const pend=k=>c.jobs.reduce((s,j)=>{const r=RECIPES.find(x=>x.id===j.id);
+    return s+((r&&r.out[k])||0);},0);
+  const requiredQty=()=>{const q={};
+    targets.forEach(r=>{if(c.made[r.id])return;
+      const inp=inputsOf(r);
+      for(const k in inp)q[k]=Math.max(q[k]||0,inp[k]);
+      if(r.station&&!r.station.some(s=>cnt(c,s)>=1))
+        q[r.station[0]]=Math.max(q[r.station[0]]||0,1);});
+    POLICY.forEach(p=>{q[p.id]=Math.max(q[p.id]||0,tv('policy.'+p.id,p.def));});
+    return q;};
+
+  for(let t=0;t<=maxSec;t++){
+    let acted=false;
+    NODES.filter(n=>!n.requires||flagOk(c,n.requires)).forEach(n=>{
+      if(t>=(c.ready[n.id]||0)){const y=yldOf(c,n);
+        for(const k in y)giveIn(c,k,(y[k][0]+y[k][1])/2);
+        c.ready[n.id]=t+cdOf(c,n);acted=true;}});
+
+    for(let i=c.jobs.length-1;i>=0;i--){
+      if(t>=c.jobs[i].done){
+        const r=RECIPES.find(x=>x.id===c.jobs[i].id);
+        for(const k in r.out)giveIn(c,k,r.out[k]);
+        c.made[r.id]=1;
+        if(!log.find(x=>x.id===r.id))log.push(entry(r,t));
+        c.jobs.splice(i,1);acted=true;}}
+
+    const plots=Math.floor(cnt(c,'farm'));
+    while(c.plots.length<plots)c.plots.push(null);
+    c.plots.forEach((p,i)=>{
+      if(!p)c.plots[i]={at:t};
+      else if(t>=p.at+growOf(c)){giveIn(c,'wheat',cropYield(c));c.plots[i]=null;acted=true;}});
+
+    const q=requiredQty();
+    for(const r of targets){
+      if(!allOk(c,r.unlock)||!stationOk(c,r)||!slotOk(c,r))continue;
+      const inp=inputsOf(r);
+      if(!affordIn(c,inp))continue;
+      const outs=Object.keys(r.out);
+      const want=(!c.made[r.id]&&!c.started[r.id])||
+                 outs.some(k=>cnt(c,k)+pend(k)<(q[k]||0));
+      if(!want)continue;
+      for(const k in inp)c.inv[k]=cnt(c,k)-inp[k];
+      c.started[r.id]=1;
+      if(r.time){c.jobs.push({id:r.id,station:stationFor(c,r),done:t+timeOf(c,r)});}
+      else{for(const k in r.out)giveIn(c,k,r.out[k]);c.made[r.id]=1;
+        if(!log.find(x=>x.id===r.id))log.push(entry(r,t));}
+      acted=true;break;
+    }
+    if(acted)actTicks.push(t);
+    if(log.length>=targets.length)break;
+  }
+  let maxGap=0,prev=0,longGaps=0;
+  actTicks.forEach(t=>{const g=t-prev;if(g>maxGap)maxGap=g;if(g>120)longGaps++;prev=t;});
+  return {log,maxGap,longGaps,done:log.length>=targets.length,
+          total:log.length?log[log.length-1].t:0,missing:targets.length-log.length};
+}
+function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
+  return {id:r.id,t:t,icon:it?it.icon:'❔',name:it?it.name:r.id};}
+
+/* ============================================================
+   表示層
+   ============================================================ */
+let tab='gather';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const mmss=m=>{const s=Math.max(0,Math.ceil(m/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const dur=sec=>sec<60?sec+'秒':(sec<3600?Math.round(sec/60)+'分':(sec/3600).toFixed(1)+'時間');
+function toast(t){const d=document.createElement('div');d.textContent=t;
+  $('toast').appendChild(d);setTimeout(()=>d.remove(),1900);}
+const TAGS={station:'<span class="tag s">作業場</span>',tool:'<span class="tag t">道具</span>',
+            plot:'<span class="tag s">区画</span>',material:''};
+function costLine(i){return Object.keys(i).map(k=>{
+  const need=i[k],have=Math.floor(count(k));
+  return '<span class="'+(have<need?'no':'')+'">'+ITEMS[k].icon+ITEMS[k].name+' '+have+'/'+need+'</span>';
+}).join('　');}
+function modLine(it){
+  if(!it||!it.mods)return '';
+  return '<div class="mod">'+it.mods.map(m=>(MOD_LABEL[m.k]||m.k)+
+    (m.mul!==undefined?' ×'+m.mul:'')+(m.add!==undefined?' '+(m.add>0?'+':'')+m.add:'')
+  ).join('　')+'</div>';
+}
+
+function viewGather(){
+  return NODES.filter(n=>!n.requires||has(n.requires)).map(n=>{
+    const left=(S.ready[n.id]||0)-now(),busy=left>0;
+    const pct=busy?100-left/ms(cdOf(S,n))*100:100;
+    const base=tv('cd.'+n.id,n.cd),real=cdOf(S,n);
+    return '<div class="card"><div class="row"><div class="ico">'+n.icon+'</div>'+
+      '<div class="grow"><div class="name">'+n.name+
+      (real<base?'<span class="tag t">短縮 '+real+'秒</span>':'')+'</div>'+
+      '<div class="sub">'+n.desc+'</div></div>'+
+      '<button onclick="gather(NODES.find(x=>x.id===\''+n.id+'\'))"'+(busy?' disabled':'')+'>'+
+      (busy?mmss(left):'採取')+'</button></div>'+
+      '<div class="bar"><i style="width:'+pct+'%"></i></div></div>';
+  }).join('')+'<div class="sub" style="margin:4px 2px">道具を持つと、新しい採取先が現れる。'+
+  '良い道具は待ち時間を縮める。</div>';
+}
+
+function viewCraft(){
+  let h='';
+  if(S.jobs.length){
+    h+='<h2 style="margin-top:8px">稼働中</h2>';
+    h+=S.jobs.map((j,i)=>{
+      const r=RECIPES.find(x=>x.id===j.id),k=Object.keys(r.out)[0],it=ITEMS[k];
+      const left=j.done-now(),done=left<=0;
+      const pct=done?100:100-left/ms(timeOf(S,r))*100;
+      return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
+        '<div class="grow"><div class="name">'+it.name+'</div>'+
+        '<div class="sub">'+ITEMS[j.station].name+'　'+(done?'完成':mmss(left))+'</div></div>'+
+        '<button onclick="collect('+i+')"'+(done?'':' disabled')+'>'+
+        (done?'受け取る':'加工中')+'</button></div>'+
+        '<div class="bar gold"><i style="width:'+pct+'%"></i></div></div>';
+    }).join('');
+    h+='<h2>作れる物</h2>';
+  }
+  const list=RECIPES.filter(r=>ok(r.unlock));
+  if(!list.length)return h+'<div class="card sub">作れる物がない。まず枝と石を集める。</div>';
+  h+=list.map(r=>{
+    const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
+    const st=stationOk(S,r),slot=slotOk(S,r),can=st&&slot&&affordIn(S,inp);
+    const owned=first?Math.floor(count(first)):0,s=stationFor(S,r);
+    return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
+      '<div class="grow"><div class="name">'+(it?it.name:'???')+
+        (it?TAGS[it.kind]:'')+(owned?'<span class="tag">所持 '+owned+'</span>':'')+
+        (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
+      '<div class="cost">'+costLine(inp)+'</div>'+modLine(it)+
+      (st?'':'<div class="need">'+r.station.map(x=>ITEMS[x].name).join(' か ')+' が必要</div>')+
+      (st&&!slot?'<div class="need">'+ITEMS[s].name+'が全て稼働中（'+
+        busyAt(S,s)+'/'+Math.floor(count(s))+'）</div>':'')+
+      '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
+      (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
+  }).join('');
+  return h+'<div class="sub" style="margin:4px 2px">設備は何個でも作れる。'+
+    '時間のかかる加工は、設備の数だけ並列できる。</div>';
+}
+
+function viewFarm(){
+  syncPlots();
+  if(!S.plots.length)return '<div class="card sub">畑がまだない。板材×4 と 石×3 で作れる。'+
+    '畑を追加で作れば区画が増える。</div>';
+  const c=CROPS.wheat;
+  return '<div class="plots">'+S.plots.map((p,i)=>{
+    if(!p)return '<div class="plot"><div class="pi">🟫</div><div class="pt">空き</div>'+
+      '<button onclick="plant('+i+')">植える</button></div>';
+    const left=p.at+ms(growOf(S))-now(),done=left<=0;
+    return '<div class="plot"><div class="pi">'+(done?c.icon:c.seed)+'</div>'+
+      '<div class="pt">'+(done?'収穫可':mmss(left))+'</div>'+
+      '<button onclick="harvest('+i+')"'+(done?'':' disabled')+'>'+(done?'収穫':'育成中')+'</button></div>';
+  }).join('')+'</div><div class="sub" style="margin:8px 2px">区画 '+S.plots.length+
+  ' ／ 麦は '+Math.round(growOf(S)/60)+'分で育つ。アプリを閉じていても進む。</div>';
+}
+
+function viewCodex(){
+  const vis=RECIPES.filter(r=>ok(r.reveal));
+  return vis.map(r=>{
+    const first=Object.keys(r.out)[0],it=ITEMS[first];
+    if(ok(r.unlock))return '<div class="card"><div class="row">'+
+      '<div class="ico">'+(it?it.icon:'❔')+'</div><div class="grow">'+
+      '<div class="name">'+(it?it.name:'???')+(it?TAGS[it.kind]:'')+
+      (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
+      '<div class="cost">'+costLine(inputsOf(r))+'</div>'+modLine(it)+'</div></div></div>';
+    return '<div class="card locked"><div class="row"><div class="ico">❔</div>'+
+      '<div class="grow"><div class="name q">？？？</div>'+
+      '<div class="hint">'+esc(r.hint)+'</div></div></div></div>';
+  }).join('')+'<div class="sub" style="margin:4px 2px">'+
+  vis.filter(r=>ok(r.unlock)).length+' / '+RECIPES.length+' 解禁</div>';
+}
+
+function num(key,def,unit){
+  return '<input type="number" inputmode="numeric" value="'+tv(key,def)+'" '+
+    'onchange="setTune(\''+key+'\',this.value)"><span class="tu">'+unit+'</span>';
+}
+function viewTune(){
+  let h='<div class="card"><h2 style="margin-top:0">採取ノード</h2>';
+  NODES.forEach(n=>{const k=Object.keys(n.yield)[0];
+    h+='<div class="tr"><div class="tl">'+n.icon+' '+n.name+' 待ち時間</div>'+num('cd.'+n.id,n.cd,'秒')+'</div>'+
+       '<div class="tr"><div class="tl">　└ 取得数 最小／最大</div>'+
+       num('y0.'+n.id,n.yield[k][0],'')+num('y1.'+n.id,n.yield[k][1],'個')+'</div>';});
+  h+='</div><div class="card"><h2 style="margin-top:0">作物</h2>'+
+     '<div class="tr"><div class="tl">🌾 麦 成長時間</div>'+num('grow.wheat',CROPS.wheat.grow,'秒')+'</div>'+
+     '<div class="tr"><div class="tl">　└ 1区画の収穫量</div>'+num('cy.wheat',CROPS.wheat.yield,'個')+'</div></div>';
+
+  h+='<div class="card"><h2 style="margin-top:0">加工時間</h2>';
+  RECIPES.filter(r=>r.time).forEach(r=>{const it=ITEMS[Object.keys(r.out)[0]];
+    h+='<div class="tr"><div class="tl">'+it.icon+' '+it.name+'</div>'+num('time.'+r.id,r.time,'秒')+'</div>';});
+  h+='</div><div class="card"><h2 style="margin-top:0">レシピ必要数</h2>';
+  RECIPES.filter(r=>!r.unlock.includes('never')).forEach(r=>{
+    const first=Object.keys(r.out)[0],it=ITEMS[first];
+    h+='<div class="tr"><div class="tl">'+(it?it.icon+' '+it.name:r.id)+'</div>'+
+      Object.keys(r.inputs).map(k=>num('in.'+r.id+'.'+k,r.inputs[k],ITEMS[k].icon)).join('')+'</div>';});
+  h+='</div><div class="card"><h2 style="margin-top:0">解禁の間隔</h2>';
+  POLICY.forEach(p=>{h+='<div class="tr"><div class="tl">測定方針：'+ITEMS[p.id].name+'をいくつ建てるか</div>'+
+    num('policy.'+p.id,p.def,'個')+'</div>';});
+  h+='<div id="sim" class="sub" style="margin-top:10px">「測定」を押すと到達時間が出る。</div>'+
+     '<div class="row" style="margin-top:12px;gap:8px">'+
+     '<button class="alt" onclick="runSim()">測定</button>'+
+     '<button class="ghost" onclick="copyTune()">数値をコピー</button>'+
+     '<button class="ghost" onclick="resetTune()">既定値</button></div></div>';
+  return h;
+}
+function setTune(k,v){S.tune[k]=(v===''?undefined:+v);save();runSim();}
+function resetTune(){S.tune={};save();render();}
+function copyTune(){try{navigator.clipboard.writeText(JSON.stringify(S.tune,null,2))
+  .then(()=>toast('コピーした'),()=>toast('コピー不可'));}catch(e){toast('コピー不可');}}
+function runSim(){
+  const el=$('sim');if(!el)return;
+  const r=simulate();let h='<div class="ladder">',prev=0;
+  r.log.forEach(x=>{h+='<div><span class="lt">'+dur(x.t)+'</span><span class="ld">+'+
+    dur(x.t-prev)+'</span><span>'+x.icon+' '+x.name+'</span></div>';prev=x.t;});
+  h+='</div>';
+  h+=r.done?'<div class="sub" style="margin-top:8px">全解禁：<b>'+dur(r.total)+'</b></div>'
+           :'<div class="sub warn" style="margin-top:8px">24時間で到達しないレシピが '+r.missing+' 件。</div>';
+  h+='<div class="sub '+(r.maxGap>600?'warn':(r.maxGap>240?'':'good'))+'">最長の手待ち：'+
+     dur(r.maxGap)+'（2分超 '+r.longGaps+' 回）</div>'+
+     '<div class="sub" style="color:#6f655a">※平均値・全操作を即実行する理想プレイでの計算</div>';
+  el.innerHTML=h;
+}
+const TABS=[
+  {id:'gather',label:'採取',icon:'🌳',view:viewGather},
+  {id:'craft', label:'作業',icon:'🛠',view:viewCraft},
+  {id:'farm',  label:'畑',  icon:'🟩',view:viewFarm},
+  {id:'codex', label:'図鑑',icon:'📖',view:viewCodex},
+  {id:'tune',  label:'調整',icon:'🎚',view:viewTune},
+];
+function render(){
+  syncPlots();
+  const held=Object.keys(ITEMS).filter(k=>count(k)>0);
+  $('inv').innerHTML=held.length
+    ? held.map(k=>'<div class="chip'+(ITEMS[k].kind==='material'?'':' st')+'">'+
+        ITEMS[k].icon+' <b>'+Math.floor(count(k))+'</b></div>').join('')
+    : '<div class="empty">持ち物なし。採取から始める。</div>';
+  $('view').innerHTML=TABS.find(x=>x.id===tab).view()+
+    (tab==='tune'?'':'<div class="dev">開発用 時間倍率'+
+      '<button class="ghost" onclick="setScale(1)">×1</button>'+
+      '<button class="ghost" onclick="setScale(60)">×60</button>'+
+      '<span>現在 ×'+S.scale+'</span>'+
+      '<button class="ghost" style="margin-left:auto" onclick="reset()">初期化</button></div>');
+  $('nav').innerHTML=TABS.map(x=>'<button class="'+(x.id===tab?'on':'')+
+    '" onclick="go(\''+x.id+'\')"><span class="nv">'+x.icon+'</span>'+x.label+'</button>').join('');
+  if(tab==='tune')runSim();
+}
+function go(id){tab=id;render();}
+function setScale(n){S.scale=n;save();render();}
+function reset(){const t=S.tune;S=fresh();S.tune=t;save();tab='gather';render();}
+render();
+setInterval(()=>{if(tab!=='tune')render();},500);
+if('serviceWorker' in navigator){window.addEventListener('load',function(){try{navigator.serviceWorker.register('sw.js').catch(function(){});}catch(e){}});}
+</script>
+</body>
+</html>
