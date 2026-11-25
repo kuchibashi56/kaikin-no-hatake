@@ -78,6 +78,10 @@
     color:#e8e0d4;border-radius:8px;padding:7px 8px;font:inherit;font-size:14px;
     text-align:right;font-variant-numeric:tabular-nums}
   input[type=number]:focus{outline:none;border-color:#c9a227}
+  .savebox{width:100%;height:68px;background:#14110e;border:1px solid #3a322a;
+    color:#8d8275;border-radius:8px;padding:8px;font:inherit;font-size:11px;
+    resize:vertical;-webkit-appearance:none}
+  .savebox:focus{outline:none;border-color:#c9a227}
   .ladder{font-variant-numeric:tabular-nums;font-size:13.5px}
   .ladder div{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #2a241e}
   .ladder div:last-child{border-bottom:none}
@@ -441,18 +445,34 @@ const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待
    調整層
    ============================================================ */
 const KEY='kuchibashi-craft-v3';
+/* セーブの版。形を変えたら上げて、migrate に移行を書き足す。
+   fresh に v を入れないのは、版を持たない古いセーブを
+   Object.assign した時に「新しい版」と誤認しないため */
+const SAVE_V=2;
 const fresh=()=>({inv:{},flags:{},acc:{},plots:[],jobs:[],scale:1,tune:{},lastSeen:0});
+
+/* セーブの形を今の版にそろえる。起動時と取り込み時の両方から通す */
+function migrate(){
+  if(!S||typeof S!=='object')S=fresh();
+  if(!S.inv)S.inv={};
+  if(!S.flags)S.flags={};
+  if(!S.tune)S.tune={};
+  if(!S.acc)S.acc={};
+  /* v1 以前: 次に採れる時刻を ready{} で持ち、plots に収穫待ちが無かった */
+  if(!S.v&&S.ready)delete S.ready;
+  S.plots=(S.plots||[]).map(p=>p?{crop:CROPS[p.crop]?p.crop:'wheat',
+    at:(+p.at||Date.now()),n:(+p.n||0)}:null);
+  /* 無くなったレシピや設備を指しているジョブは捨てる。
+     残したまま描こうとすると画面ごと落ちるため */
+  S.jobs=(S.jobs||[]).filter(j=>j&&ITEMS[j.station]&&RECIPES.some(r=>r.id===j.id));
+  /* 時間倍率は開発用。保存された値をそのまま使うと、不在中の蓄積まで
+     倍率ぶん進んでしまうため、起動時は必ず等倍に戻す */
+  S.scale=1;
+  S.v=SAVE_V;
+}
 let S=fresh();
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(fresh(),JSON.parse(r));}catch(e){}
-if(!S.tune)S.tune={};
-if(!S.jobs)S.jobs=[];
-if(!S.acc)S.acc={};
-/* 旧セーブからの移行。ready{} は捨て、plots を {at,n} 形式にそろえる */
-if(S.ready)delete S.ready;
-S.plots=(S.plots||[]).map(p=>p?{crop:'wheat',at:(p.at||Date.now()),n:(p.n||0)}:null);
-/* 時間倍率は開発用。保存された値をそのまま使うと、不在中の蓄積まで
-   倍率ぶん進んでしまうため、起動時は必ず等倍に戻す */
-S.scale=1;
+migrate();
 /* 不在時間。蓄積を進める前に測る */
 const AWAY=Math.max(0,Date.now()-(S.lastSeen||Date.now()));
 const save=()=>{try{S.lastSeen=Date.now();localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
@@ -612,6 +632,7 @@ function craft(r){
 function collect(i){
   const j=S.jobs[i];if(!j||now()<j.done)return;
   const r=RECIPES.find(x=>x.id===j.id),names=[];
+  if(!r){S.jobs.splice(i,1);save();render();return;}
   if(!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
   S.jobs.splice(i,1);toast(names.join(' / '));save();render();
@@ -824,7 +845,9 @@ function viewArea(){
 
 /* --- 1件ぶんの描画。施設画面から使い回す --- */
 function jobCard(j,i){
-  const r=RECIPES.find(x=>x.id===j.id),k=Object.keys(r.out)[0],it=ITEMS[k];
+  const r=RECIPES.find(x=>x.id===j.id);
+  if(!r||!ITEMS[j.station])return '';
+  const k=Object.keys(r.out)[0],it=ITEMS[k];
   const left=j.done-now(),done=left<=0;
   const pct=done?100:100-left/ms(timeOf(S,r))*100;
   return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
@@ -866,7 +889,8 @@ function facilities(){
   });
   return out;
 }
-const jobsAt=id=>S.jobs.map((j,i)=>({j:j,i:i})).filter(x=>x.j.station===id);
+const jobsAt=id=>S.jobs.map((j,i)=>({j:j,i:i}))
+  .filter(x=>x.j.station===id&&RECIPES.some(r=>r.id===x.j.id));
 /* その施設で扱えるレシピ。station が複数書いてあるレシピは、
    実際に使われる1つ（stationFor）の下にだけ出す */
 function recipesAt(id){
@@ -1031,10 +1055,55 @@ function viewTune(){
      '<button class="alt" onclick="runSim()">測定</button>'+
      '<button class="ghost" onclick="copyTune()">数値をコピー</button>'+
      '<button class="ghost" onclick="resetTune()">既定値</button></div></div>';
+  h+='<div class="card"><h2 style="margin-top:0">セーブ</h2>'+
+     '<div class="sub">書き出した文字列を控えておけば、端末を変えても続きから遊べる。'+
+     '読み込むと今の状態は上書きされるが、直前の状態は控えに残る。</div>'+
+     '<textarea id="savebox" class="savebox" '+
+     'placeholder="ここに貼り付けてから「読み込む」"></textarea>'+
+     '<div class="row" style="gap:8px;margin-top:8px">'+
+     '<button class="alt" onclick="exportSave()">書き出す</button>'+
+     '<button class="ghost" onclick="importSave()">読み込む</button>'+
+     '<button class="ghost" style="margin-left:auto" onclick="restoreBackup()">控えに戻す</button>'+
+     '</div><div class="sub" style="margin-top:6px">セーブ版 '+(S.v||'?')+'</div></div>';
   return h;
 }
 function setTune(k,v){S.tune[k]=(v===''?undefined:+v);save();runSim();}
 function resetTune(){S.tune={};save();render();}
+/* 上書きの前に、直前の状態を別キーに逃がしておく */
+function backupSave(){
+  try{localStorage.setItem(KEY+'-backup',JSON.stringify(S));}catch(e){}
+}
+function exportSave(){
+  const t=$('savebox');if(!t)return;
+  t.value=JSON.stringify(S);
+  try{t.focus();t.select();}catch(e){}
+  try{navigator.clipboard.writeText(t.value)
+    .then(()=>toast('コピーした'),()=>toast('枠の中を手でコピー'));}
+  catch(e){toast('枠の中を手でコピー');}
+}
+function importSave(){
+  const t=$('savebox');if(!t)return;
+  const raw=(t.value||'').trim();
+  if(!raw){toast('枠に貼り付けてから押す');return;}
+  let d;
+  try{d=JSON.parse(raw);}catch(e){toast('読み取れない文字列');return;}
+  if(!d||typeof d!=='object'||!d.inv){toast('セーブデータに見えない');return;}
+  backupSave();
+  S=Object.assign(fresh(),d);
+  migrate();save();
+  tab='area';fac=null;area=null;WELCOME=null;render();
+  toast('読み込んだ');
+}
+function restoreBackup(){
+  let raw=null;
+  try{raw=localStorage.getItem(KEY+'-backup');}catch(e){}
+  if(!raw){toast('戻せる控えがない');return;}
+  let d;try{d=JSON.parse(raw);}catch(e){toast('控えが壊れている');return;}
+  S=Object.assign(fresh(),d);
+  migrate();save();
+  tab='area';fac=null;area=null;WELCOME=null;render();
+  toast('直前の状態に戻した');
+}
 function copyTune(){try{navigator.clipboard.writeText(JSON.stringify(S.tune,null,2))
   .then(()=>toast('コピーした'),()=>toast('コピー不可'));}catch(e){toast('コピー不可');}}
 function runSim(){
@@ -1095,6 +1164,7 @@ function render(){
   $('view').innerHTML=(tab==='tune'?'':welcomeHtml())+TABS.find(x=>x.id===tab).view()+
     (tab==='tune'?'':'<div class="dev">開発用 時間倍率'+
       '<button class="ghost" onclick="setScale(1)">×1</button>'+
+      '<button class="ghost" onclick="setScale(10)">×10</button>'+
       '<button class="ghost" onclick="setScale(60)">×60</button>'+
       '<span>現在 ×'+S.scale+'（起動時は×1）</span>'+
       '<button class="ghost" style="margin-left:auto" onclick="reset()">初期化</button></div>');
@@ -1105,8 +1175,23 @@ function render(){
 function go(id){tab=id;fac=null;area=null;render();}
 function goFac(id){fac=id;render();}
 function goArea(id){area=id;render();}
-function setScale(n){S.scale=n;save();render();}
-function reset(){const t=S.tune;S=fresh();S.tune=t;save();tab='gather';render();}
+/* 倍率を変えても、すでに動いている加工や蓄積が置き去りにならないよう、
+   残り時間と経過時間を比率で引き直す。これが無いと、通しで遊んで
+   確かめるときに炉だけ元の速さのまま取り残される */
+function setScale(n){
+  const old=S.scale||1,t=now();
+  if(n!==old){
+    S.jobs.forEach(j=>{j.done=t+(j.done-t)*old/n;});
+    Object.keys(S.acc).forEach(k=>{const a=S.acc[k];a.t=t+(a.t-t)*old/n;});
+    S.plots.forEach(p=>{if(p)p.at=t-(t-p.at)*old/n;});
+  }
+  S.scale=n;save();render();
+}
+function reset(){
+  backupSave();                       /* 消す前に、戻せるようにしておく */
+  const t=S.tune;S=fresh();S.tune=t;migrate();save();
+  tab='area';fac=null;area=null;render();
+}
 accrueAll();
 WELCOME=buildWelcome(AWAY);
 save();
