@@ -22,6 +22,8 @@
         padding:6px 10px;font-size:13px;white-space:nowrap}
   .chip.st{border-color:#4a3f28}
   .chip b{font-variant-numeric:tabular-nums}
+  .chip.full{border-color:#c4604a;color:#c4604a}
+  .chip .cp{color:#6f655a;font-size:11px}
   .inv .empty{color:#6f655a;font-size:13px;padding:6px 2px}
 
   .card{background:#201b16;border:1px solid #2e2720;border-radius:14px;padding:12px;margin-bottom:10px}
@@ -123,6 +125,7 @@ const ITEMS={
   furnace:  {name:'炉',      icon:'🔥',kind:'station'},
   workshop: {name:'複合工房',icon:'🏭',kind:'station'},
   farm:     {name:'畑',      icon:'🟩',kind:'plot'},
+  crate:    {name:'収納箱',  icon:'📦',kind:'storage'},
 
   stone_axe:{name:'石の斧',    icon:'🪓',kind:'tool'},
   pickaxe:  {name:'石のツルハシ',icon:'⛏',kind:'tool'},
@@ -152,6 +155,8 @@ const RECIPES=[
    unlock:['got:stone_axe'],reveal:['got:workbench'],hint:'丸太を割ると2つ取れる物'},
   {id:'farm',out:{farm:1},inputs:{plank:4,stone:3},station:['workbench','workshop'],
    unlock:['got:plank'],reveal:['got:stone_axe'],hint:'板材×4 と 石×3'},
+  {id:'crate',out:{crate:1},inputs:{plank:4,branch:2},station:['workbench','workshop'],
+   unlock:['got:plank'],reveal:['got:workbench'],hint:'しまっておく物。置ける量が増える'},
   {id:'mill',out:{mill:1},inputs:{wheat:12,plank:6},station:['workbench','workshop'],
    unlock:['got:wheat'],reveal:['got:farm'],hint:'麦×12 と 板材×6'},
   {id:'flour',out:{flour:1},inputs:{wheat:4},station:['mill','workshop'],
@@ -179,9 +184,11 @@ const CROPS={wheat:{name:'麦',icon:'🌾',seed:'🌱',grow:300,yield:3}};
 
 /* 放置でたまる上限（待ち時間の何回分か）。調整タブで変更できる */
 const CAP_NODE=8, CAP_PLOT=12;
+/* 素材1種あたりの保管上限。収納箱1つごとに増え、CAP_MAX で頭打ちになる */
+const CAP_BASE=40, CAP_BOX=40, CAP_MAX=999;
 
 /* 任意投資。コストから導けないのでシミュレーター用の方針として与える */
-const POLICY=[{id:'farm',def:3},{id:'furnace',def:2}];
+const POLICY=[{id:'farm',def:3},{id:'furnace',def:2},{id:'crate',def:3}];
 
 const MOD_LABEL={'cd.branch':'低木の待ち時間','cd.stone':'石ころの待ち時間',
   'cd.log':'大木の待ち時間','cd.ore':'鉱脈の待ち時間','grow.wheat':'麦の成長時間',
@@ -269,7 +276,21 @@ function flagOk(c,f){
 }
 const allOk=(c,l)=>l.every(f=>flagOk(c,f));
 const affordIn=(c,i)=>Object.keys(i).every(k=>cnt(c,k)>=i[k]);
-function giveIn(c,id,n){if(n<=0)return;c.inv[id]=cnt(c,id)+n;c.flags['got:'+id]=1;}
+/* 素材1種あたりの保管上限。収納箱を作ると増える */
+const invCap=c=>Math.min(tv('cap.max',CAP_MAX),
+  tv('cap.base',CAP_BASE)+cnt(c,'crate')*tv('cap.box',CAP_BOX));
+const isCapped=id=>!!ITEMS[id]&&ITEMS[id].kind==='material';
+const roomFor=(c,id)=>isCapped(id)?Math.max(0,invCap(c)-cnt(c,id)):Infinity;
+/* 入りきる分だけ渡し、実際に入った数を返す */
+function giveIn(c,id,n){
+  if(n<=0)return 0;
+  n=Math.min(n,roomFor(c,id));
+  if(n<=0)return 0;
+  c.inv[id]=cnt(c,id)+n;c.flags['got:'+id]=1;return n;
+}
+/* 産出が全部入るか。入らないなら受け取らせず、溢れて消えないようにする */
+const outFits=(c,r)=>Object.keys(r.out).every(k=>r.out[k]<=roomFor(c,k));
+const FULLMSG='📦 置き場がない。収納箱を作ると増える';
 const stationFor=(c,r)=>r.station?(r.station.find(s=>cnt(c,s)>=1)||null):null;
 const stationOk=(c,r)=>!r.station||!!stationFor(c,r);
 const busyAt=(c,s)=>(c.jobs||[]).filter(j=>j.station===s).length;
@@ -293,16 +314,28 @@ function gather(node){
   const a=accNode(node);
   if(a.n<1)return;
   const y=yldOf(S,node),tot={};
-  for(let i=0;i<a.n;i++)for(const k in y){const[lo,hi]=y[k];
-    tot[k]=(tot[k]||0)+lo+Math.floor(Math.random()*(Math.max(lo,hi)-lo+1));}
+  let taken=0;
+  for(let i=0;i<a.n;i++){
+    /* この1回で出うる最大量が入らなければ、残りはノードに置いたままにする */
+    let fits=true;
+    for(const k in y)
+      if((tot[k]||0)+Math.max(y[k][0],y[k][1])>roomFor(S,k))fits=false;
+    if(!fits)break;
+    for(const k in y){const[lo,hi]=y[k];
+      tot[k]=(tot[k]||0)+lo+Math.floor(Math.random()*(Math.max(lo,hi)-lo+1));}
+    taken++;
+  }
+  if(taken<1){toast(FULLMSG);return;}
   const got=[];
-  for(const k in tot){giveIn(S,k,tot[k]);got.push(ITEMS[k].icon+ITEMS[k].name+'×'+tot[k]);}
-  a.n=0;a.t=now();
+  for(const k in tot){const g=giveIn(S,k,tot[k]);
+    if(g>0)got.push(ITEMS[k].icon+ITEMS[k].name+'×'+g);}
+  a.n-=taken;a.t=now();
   toast(got.join(' / '));save();render();
 }
 function craft(r){
   const inp=inputsOf(r);
   if(!ok(r.unlock)||!stationOk(S,r)||!affordIn(S,inp)||!slotOk(S,r))return;
+  if(!r.time&&!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in inp)S.inv[k]=count(k)-inp[k];
   if(r.time){
     S.jobs.push({id:r.id,station:stationFor(S,r),done:now()+ms(timeOf(S,r))});
@@ -318,13 +351,17 @@ function craft(r){
 function collect(i){
   const j=S.jobs[i];if(!j||now()<j.done)return;
   const r=RECIPES.find(x=>x.id===j.id),names=[];
+  if(!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
   S.jobs.splice(i,1);toast(names.join(' / '));save();render();
 }
 function plant(i){S.plots[i]={crop:'wheat',at:now(),n:0};save();render();}
 function harvest(i){const p=accPlot(S.plots[i]);if(!p||p.n<1)return;
-  const n=p.n*cropYield(S);giveIn(S,'wheat',n);
-  p.n=0;p.at=now();toast('🌾麦×'+n);save();render();}
+  const per=Math.max(1,cropYield(S));
+  const take=Math.min(p.n,Math.floor(roomFor(S,'wheat')/per));
+  if(take<1){toast(FULLMSG);return;}
+  const n=giveIn(S,'wheat',take*per);
+  p.n-=take;p.at=now();toast('🌾麦×'+n);save();render();}
 
 /* ============================================================
    シミュレーター
@@ -403,7 +440,8 @@ const dur=sec=>sec<60?sec+'秒':(sec<3600?Math.round(sec/60)+'分':(sec/3600).to
 function toast(t){const d=document.createElement('div');d.textContent=t;
   $('toast').appendChild(d);setTimeout(()=>d.remove(),1900);}
 const TAGS={station:'<span class="tag s">作業場</span>',tool:'<span class="tag t">道具</span>',
-            plot:'<span class="tag s">区画</span>',material:''};
+            plot:'<span class="tag s">区画</span>',storage:'<span class="tag s">収納</span>',
+            material:''};
 function costLine(i){return Object.keys(i).map(k=>{
   const need=i[k],have=Math.floor(count(k));
   return '<span class="'+(have<need?'no':'')+'">'+ITEMS[k].icon+ITEMS[k].name+' '+have+'/'+need+'</span>';
@@ -436,7 +474,8 @@ function viewGather(){
 }
 
 function viewCraft(){
-  let h='';
+  let h='<div class="sub" style="margin:4px 2px">📦 置ける量 素材1種あたり '+invCap(S)+
+    '（収納箱 '+Math.floor(count('crate'))+'個）</div>';
   if(S.jobs.length){
     h+='<h2 style="margin-top:8px">稼働中</h2>';
     h+=S.jobs.map((j,i)=>{
@@ -533,6 +572,15 @@ function viewTune(){
     const first=Object.keys(r.out)[0],it=ITEMS[first];
     h+='<div class="tr"><div class="tl">'+(it?it.icon+' '+it.name:r.id)+'</div>'+
       Object.keys(r.inputs).map(k=>num('in.'+r.id+'.'+k,r.inputs[k],ITEMS[k].icon)).join('')+'</div>';});
+  h+='</div><div class="card"><h2 style="margin-top:0">収納</h2>'+
+     '<div class="tr"><div class="tl">📦 初期の置ける量（素材1種あたり）</div>'+
+     num('cap.base',CAP_BASE,'個')+'</div>'+
+     '<div class="tr"><div class="tl">　└ 収納箱1つあたりの増加</div>'+
+     num('cap.box',CAP_BOX,'個')+'</div>'+
+     '<div class="tr"><div class="tl">　└ ここで頭打ち</div>'+
+     num('cap.max',CAP_MAX,'個')+'</div>'+
+     '<div class="sub" style="margin-top:6px">いまの値 '+invCap(S)+
+     '　収納箱 '+Math.floor(count('crate'))+'個</div>';
   h+='</div><div class="card"><h2 style="margin-top:0">解禁の間隔</h2>';
   POLICY.forEach(p=>{h+='<div class="tr"><div class="tl">測定方針：'+ITEMS[p.id].name+'をいくつ建てるか</div>'+
     num('policy.'+p.id,p.def,'個')+'</div>';});
@@ -592,9 +640,14 @@ const TABS=[
 function render(){
   syncPlots();
   const held=Object.keys(ITEMS).filter(k=>count(k)>0);
+  const icap=invCap(S);
   $('inv').innerHTML=held.length
-    ? held.map(k=>'<div class="chip'+(ITEMS[k].kind==='material'?'':' st')+'">'+
-        ITEMS[k].icon+' <b>'+Math.floor(count(k))+'</b></div>').join('')
+    ? held.map(k=>{const mat=ITEMS[k].kind==='material',c=Math.floor(count(k));
+        /* 上限が近いときだけ分母を出す。普段は数字だけで読みやすく保つ */
+        return '<div class="chip'+(mat?'':' st')+(mat&&c>=icap?' full':'')+'">'+
+          ITEMS[k].icon+' <b>'+c+'</b>'+
+          (mat&&c>=icap*0.8?'<span class="cp">/'+icap+'</span>':'')+'</div>';
+      }).join('')
     : '<div class="empty">持ち物なし。採取から始める。</div>';
   $('view').innerHTML=(tab==='tune'?'':welcomeHtml())+TABS.find(x=>x.id===tab).view()+
     (tab==='tune'?'':'<div class="dev">開発用 時間倍率'+
