@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14110e">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>解禁の畑 — Tier 2</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -208,6 +210,9 @@ if(!S.acc)S.acc={};
 /* 旧セーブからの移行。ready{} は捨て、plots を {at,n} 形式にそろえる */
 if(S.ready)delete S.ready;
 S.plots=(S.plots||[]).map(p=>p?{crop:'wheat',at:(p.at||Date.now()),n:(p.n||0)}:null);
+/* 時間倍率は開発用。保存された値をそのまま使うと、不在中の蓄積まで
+   倍率ぶん進んでしまうため、起動時は必ず等倍に戻す */
+S.scale=1;
 /* 不在時間。蓄積を進める前に測る */
 const AWAY=Math.max(0,Date.now()-(S.lastSeen||Date.now()));
 const save=()=>{try{S.lastSeen=Date.now();localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
@@ -242,9 +247,21 @@ const cropYield=c=>eff(c,'cy.wheat',CROPS.wheat.yield,0);
 const timeOf=(c,r)=>r.time?eff(c,'time.'+r.id,r.time,1):0;
 const inputsOf=r=>{const o={};for(const k in r.inputs)o[k]=tv('in.'+r.id+'.'+k,r.inputs[k]);return o;};
 
+function flagOk(c,f){
+  if(f==='start')return true;
+  if(f==='never')return false;
+  const i=f.indexOf(':'),k=f.slice(0,i),v=f.slice(i+1);
+  if(k==='got') return !!c.flags['got:'+v];
+  if(k==='have')return cnt(c,v)>=1;
+  return false;
+}
+
 /* --- 放置の蓄積。閉じている間の経過を、開いた時にまとめて精算する --- */
+const nodeOpen=n=>!n.requires||flagOk(S,n.requires);
 function accNode(node){
   const a=S.acc[node.id]||(S.acc[node.id]={n:0,t:now()});
+  /* まだ解禁していないノードはためない。解禁した時点から数え始める */
+  if(!nodeOpen(node)){a.n=0;a.t=now();return a;}
   const step=ms(cdOf(S,node)),cap=capOf(node);
   if(step>0&&now()>a.t){
     const g=Math.floor((now()-a.t)/step);
@@ -265,15 +282,6 @@ function accPlot(p){
   return p;
 }
 function accrueAll(){NODES.forEach(accNode);S.plots.forEach(accPlot);}
-
-function flagOk(c,f){
-  if(f==='start')return true;
-  if(f==='never')return false;
-  const i=f.indexOf(':'),k=f.slice(0,i),v=f.slice(i+1);
-  if(k==='got') return !!c.flags['got:'+v];
-  if(k==='have')return cnt(c,v)>=1;
-  return false;
-}
 const allOk=(c,l)=>l.every(f=>flagOk(c,f));
 const affordIn=(c,i)=>Object.keys(i).every(k=>cnt(c,k)>=i[k]);
 /* 素材1種あたりの保管上限。収納箱を作ると増える */
@@ -495,7 +503,9 @@ function viewCraft(){
   if(!list.length)return h+'<div class="card sub">作れる物がない。まず枝と石を集める。</div>';
   h+=list.map(r=>{
     const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
-    const st=stationOk(S,r),slot=slotOk(S,r),can=st&&slot&&affordIn(S,inp);
+    const st=stationOk(S,r),slot=slotOk(S,r);
+    const fits=!!r.time||outFits(S,r);
+    const can=st&&slot&&affordIn(S,inp)&&fits;
     const owned=first?Math.floor(count(first)):0,s=stationFor(S,r);
     return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
       '<div class="grow"><div class="name">'+(it?it.name:'???')+
@@ -505,6 +515,7 @@ function viewCraft(){
       (st?'':'<div class="need">'+r.station.map(x=>ITEMS[x].name).join(' か ')+' が必要</div>')+
       (st&&!slot?'<div class="need">'+ITEMS[s].name+'が全て稼働中（'+
         busyAt(S,s)+'/'+Math.floor(count(s))+'）</div>':'')+
+      (fits?'':'<div class="need">置き場がない。収納箱を作ると増える</div>')+
       '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
       (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
   }).join('');
@@ -653,7 +664,7 @@ function render(){
     (tab==='tune'?'':'<div class="dev">開発用 時間倍率'+
       '<button class="ghost" onclick="setScale(1)">×1</button>'+
       '<button class="ghost" onclick="setScale(60)">×60</button>'+
-      '<span>現在 ×'+S.scale+'</span>'+
+      '<span>現在 ×'+S.scale+'（起動時は×1）</span>'+
       '<button class="ghost" style="margin-left:auto" onclick="reset()">初期化</button></div>');
   $('nav').innerHTML=TABS.map(x=>'<button class="'+(x.id===tab?'on':'')+
     '" onclick="go(\''+x.id+'\')"><span class="nv">'+x.icon+'</span>'+x.label+'</button>').join('');
