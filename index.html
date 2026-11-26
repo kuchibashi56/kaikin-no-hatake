@@ -44,6 +44,10 @@
   button:disabled{background:#2a241e;color:#6f655a}
   button.alt{background:#c9a227}
   button.ghost{background:transparent;border:1px solid #3a322a;color:#a89c8c;font-weight:500}
+  /* 押せないボタンは必ず沈んで見せる。上の button:disabled だけだと
+     後から来る button.alt に同じ詳細度で負け、金色のまま残っていた */
+  button:disabled,button.alt:disabled,button.ghost:disabled{
+    background:#2a241e;color:#6f655a;border-color:#2a241e;cursor:default}
 
   .bar{height:4px;background:#2a241e;border-radius:3px;margin-top:9px;overflow:hidden}
   .bar i{display:block;height:100%;background:#6b8f3f;border-radius:3px}
@@ -68,6 +72,8 @@
   .cost{font-size:12.5px;color:#8d8275;margin-top:4px}
   .cost .no{color:#c4604a}
   .need{font-size:12px;color:#c4604a;margin-top:3px}
+  .slotline{font-size:12px;color:#6f655a;margin-top:3px;font-variant-numeric:tabular-nums}
+  .slotline.no{color:#c4604a}
   .mod{font-size:12px;color:#7fa3c4;margin-top:3px}
 
   .tr{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #2a241e}
@@ -611,7 +617,7 @@ function gather(node){
   for(const k in tot){const g=giveIn(S,k,tot[k]);
     if(g>0)got.push(ITEMS[k].icon+ITEMS[k].name+'×'+g);}
   a.n-=taken;a.t=now();
-  toast(got.join(' / '));save();render();
+  toast(got.join(' / '));save();renderKeep();
 }
 function craft(r){
   const inp=inputsOf(r);
@@ -627,18 +633,18 @@ function craft(r){
     const first=ITEMS[Object.keys(r.out)[0]];
     toast((first&&first.kind==='material'?'':'🎉 ')+names.join(' / '));
   }
-  syncPlots();save();render();
+  syncPlots();save();renderKeep();
 }
 function collect(i){
   const j=S.jobs[i];if(!j||now()<j.done)return;
   const r=RECIPES.find(x=>x.id===j.id),names=[];
-  if(!r){S.jobs.splice(i,1);save();render();return;}
+  if(!r){S.jobs.splice(i,1);save();renderKeep();return;}
   if(!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
-  S.jobs.splice(i,1);toast(names.join(' / '));save();render();
+  S.jobs.splice(i,1);toast(names.join(' / '));save();renderKeep();
 }
 function plant(i,k){if(!CROPS[k]||!cropOpen(S,k))return;
-  S.plots[i]={crop:k,at:now(),n:0};save();render();}
+  S.plots[i]={crop:k,at:now(),n:0};save();renderKeep();}
 /* 植え替え。たまっている分は先に収穫しておく必要がある */
 function replant(i,k){const p=S.plots[i];
   if(p&&p.n>0){toast('先に収穫してから');return;}
@@ -649,7 +655,7 @@ function harvest(i){const p=accPlot(S.plots[i]);if(!p||p.n<1)return;
   const take=Math.min(p.n,Math.floor(roomFor(S,k)/per));
   if(take<1){toast(FULLMSG);return;}
   const n=giveIn(S,k,take*per);
-  p.n-=take;p.at=now();toast(cropOf(k).icon+cropOf(k).name+'×'+n);save();render();}
+  p.n-=take;p.at=now();toast(cropOf(k).icon+cropOf(k).name+'×'+n);save();renderKeep();}
 
 /* ============================================================
    シミュレーター
@@ -857,6 +863,15 @@ function jobCard(j,i){
     (done?'受け取る':'加工中')+'</button></div>'+
     '<div class="bar gold"><i style="width:'+pct+'%"></i></div></div>';
 }
+/* 空いている加工の枠。jobCard と同じ構造にして高さを合わせる */
+function emptySlot(f){
+  return '<div class="card"><div class="row">'+
+    '<div class="ico" style="opacity:.3">'+f.icon+'</div>'+
+    '<div class="grow"><div class="name q">空き</div>'+
+    '<div class="sub">下の一覧から投入できる</div></div>'+
+    '<button disabled>待機</button></div>'+
+    '<div class="bar"><i style="width:0"></i></div></div>';
+}
 function recipeCard(r){
   const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
   const st=stationOk(S,r),slot=slotOk(S,r);
@@ -869,8 +884,8 @@ function recipeCard(r){
       (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
     '<div class="cost">'+costLine(inp)+'</div>'+modLine(it)+
     (st?'':'<div class="need">'+r.station.map(x=>ITEMS[x].name).join(' か ')+' が必要</div>')+
-    (st&&!slot?'<div class="need">'+ITEMS[sx].name+'が全て稼働中（'+
-      busyAt(S,sx)+'/'+Math.floor(count(sx))+'）</div>':'')+
+    (st&&r.time?'<div class="slotline'+(slot?'':' no')+'">'+ITEMS[sx].name+
+      ' 稼働 '+busyAt(S,sx)+' / '+Math.floor(count(sx))+'</div>':'')+
     (fits?'':'<div class="need">置き場がない。収納箱を作ると増える</div>')+
     '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
     (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
@@ -941,7 +956,14 @@ function viewFac(){
         '（収納箱 '+Math.floor(count('crate'))+'個 / 石蔵 '+
         Math.floor(count('vault'))+'個）。</div>';
     const js=jobsAt(f.id),rs=recipesAt(f.id);
-    if(js.length)h+='<h2 style="margin-top:0">稼働中</h2>'+js.map(x=>jobCard(x.j,x.i)).join('');
+    /* 加工できる施設では、空いている枠も含めて設備の数だけ枠を出す。
+       投入や受け取りのたびに枠が増え減りすると、下の一覧がその高さぶん
+       上下して、さっき押したボタンの位置に別のボタンが来てしまう */
+    if(rs.some(r=>r.time)||js.length){
+      const slots=Math.max(f.count,js.length);
+      h+='<h2 style="margin-top:0">加工の枠　'+js.length+' / '+slots+'</h2>';
+      for(let i=0;i<slots;i++)h+=js[i]?jobCard(js[i].j,js[i].i):emptySlot(f);
+    }
     if(rs.length)h+='<h2>ここで扱える物</h2>'+rs.map(recipeCard).join('');
     const it=ITEMS[f.id];
     if(it&&it.mods)h+='<div class="card"><div class="name">効果</div>'+modLine(it)+'</div>';
@@ -1171,6 +1193,15 @@ function render(){
   $('nav').innerHTML=TABS.map(x=>'<button class="'+(x.id===tab?'on':'')+
     '" onclick="go(\''+x.id+'\')"><span class="nv">'+x.icon+'</span>'+x.label+'</button>').join('');
   if(tab==='tune')runSim();
+}
+/* 押した場所が動かないよう、描き直しの前後でスクロール位置を揃える。
+   0.5秒ごとの自動描画では呼ばない（指で慣性スクロール中に
+   位置を書き戻すと、スクロールが止まってしまうため） */
+function renderKeep(){
+  const y=window.scrollY||document.documentElement.scrollTop||0;
+  render();
+  const y2=window.scrollY||document.documentElement.scrollTop||0;
+  if(y&&Math.abs(y2-y)>1)window.scrollTo(0,y);
 }
 function go(id){tab=id;fac=null;area=null;render();}
 function goFac(id){fac=id;render();}
