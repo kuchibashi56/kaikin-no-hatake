@@ -43,6 +43,9 @@
     border-radius:8px;padding:0 6px;font-size:11px;font-weight:700;vertical-align:1px}
   .row{display:flex;align-items:center;gap:10px}
   .ico{font-size:26px;width:34px;text-align:center;flex:0 0 auto}
+  /* 絵文字の代わりに置く画像。文字と同じ大きさで並ぶようにしてある */
+  .ic{width:1.1em;height:1.1em;display:inline-block;vertical-align:-.18em;
+      object-fit:contain;-webkit-user-drag:none}
   .name{font-weight:600}
   .sub{color:#8d8275;font-size:12.5px;margin-top:2px}
   .grow{flex:1;min-width:0}
@@ -737,7 +740,7 @@ function installUpg(fid,i,k){
   if(count(spec.item)<1){toast(ITEMS[spec.item].name+'がない');return;}
   S.inv[spec.item]=count(spec.item)-1;
   u.up[k]=1;save();renderKeep();
-  toast(ITEMS[spec.item].icon+' 据え付けた');
+  toast(icoI(spec.item)+' 据え付けた');
 }
 
 /* --- 本体 --- */
@@ -768,7 +771,7 @@ function gather(node){
   if(taken<1){toast(FULLMSG);return;}
   const got=[];
   for(const k in tot){const g=giveIn(S,k,tot[k]);
-    if(g>0)got.push(ITEMS[k].icon+ITEMS[k].name+'×'+g);}
+    if(g>0)got.push(icoI(k)+ITEMS[k].name+'×'+g);}
   a.n-=taken;a.t=now();
   toast(got.join(' / '));save();renderKeep();
 }
@@ -788,7 +791,7 @@ function craft(r){
     toast('🔥 投入した');
   }else{
     const names=[];
-    for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
+    for(const k in r.out){giveIn(S,k,r.out[k]);names.push(icoI(k)+ITEMS[k].name+'×'+r.out[k]);}
     const first=ITEMS[Object.keys(r.out)[0]];
     toast((first&&first.kind==='material'?'':'🎉 ')+names.join(' / '));
   }
@@ -799,7 +802,7 @@ function collect(i){
   const r=RECIPES.find(x=>x.id===j.id),names=[];
   if(!r){S.jobs.splice(i,1);save();renderKeep();return;}
   if(!outFits(S,r)){toast(FULLMSG);return;}
-  for(const k in r.out){giveIn(S,k,r.out[k]);names.push(ITEMS[k].icon+ITEMS[k].name+'×'+r.out[k]);}
+  for(const k in r.out){giveIn(S,k,r.out[k]);names.push(icoI(k)+ITEMS[k].name+'×'+r.out[k]);}
   S.jobs.splice(i,1);toast(names.join(' / '));save();renderKeep();
 }
 /* 完成した物をまとめて受け取る。1台ずつ開かずに済ませるため */
@@ -836,7 +839,7 @@ function applyFert(i,id){
   if(p.fert===id)return;
   S.inv[id]=count(id)-1;
   p.fert=id;save();renderKeep();
-  toast(ITEMS[id].icon+' 入れた');
+  toast(icoI(id)+' 入れた');
 }
 /* 植え替え。たまっている分は先に収穫しておく必要がある */
 function replant(i,k){const p=S.plots[i];
@@ -848,7 +851,7 @@ function harvest(i){const p=accPlot(S.plots[i]);if(!p||p.n<1)return;
   const take=Math.min(p.n,Math.floor(roomFor(S,k)/per));
   if(take<1){toast(FULLMSG);return;}
   const n=giveIn(S,k,take*per);
-  p.n-=take;p.at=now();toast(cropOf(k).icon+cropOf(k).name+'×'+n);save();renderKeep();}
+  p.n-=take;p.at=now();toast(icoC(k)+cropOf(k).name+'×'+n);save();renderKeep();}
 
 /* ============================================================
    シミュレーター
@@ -943,11 +946,26 @@ function simulate(maxSec=86400){
           total:log.length?log[log.length-1].t:0,missing:targets.length-log.length};
 }
 function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
-  return {id:r.id,t:t,icon:it?it.icon:'❔',name:it?it.name:r.id};}
+  return {id:r.id,t:t,icon:it?icoI(k):'❔',name:it?it.name:r.id};}
 
 /* ============================================================
    表示層
    ============================================================ */
+/* 絵の出どころ。ここだけが「何で描くか」を知っている。
+   ART に名前を並べると、その物は img/<種別>/<名前>.png になり、
+   並んでいない物はこれまでどおり絵文字で出る。混ざっても崩れない。
+   例: const ART=['item.stone','node.ore','area.cave']; */
+const ART=[];
+function art(key,emoji){
+  return ART.indexOf(key)<0?(emoji||'❔')
+    :'<img class="ic" src="img/'+key.replace('.','/')+'.png" alt="">';
+}
+const icoI=k=>art('item.'+k,(ITEMS[k]||{}).icon);            /* 物 */
+const icoN=x=>art('node.'+x.id,x.icon);                      /* 採取場所 */
+const icoA=x=>art('area.'+x.id,x.icon);                      /* エリア */
+const icoF=x=>art('item.'+x.id,x.icon);                      /* 施設 */
+const icoC=k=>art('item.'+(CROPS[k]?k:'wheat'),cropOf(k).icon); /* 作物 */
+const icoS=k=>art('seed.'+(CROPS[k]?k:'wheat'),cropOf(k).seed); /* 種 */
 let tab='area',fac=null,area=null,facView='make',plotSel=null,unitSel=null,WELCOME=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
@@ -961,7 +979,7 @@ const TAGS={station:'<span class="tag s">作業場</span>',tool:'<span class="ta
             material:''};
 function costLine(i){return Object.keys(i).map(k=>{
   const need=i[k],have=Math.floor(count(k));
-  return '<span class="'+(have<need?'no':'')+'">'+ITEMS[k].icon+ITEMS[k].name+' '+have+'/'+need+'</span>';
+  return '<span class="'+(have<need?'no':'')+'">'+icoI(k)+ITEMS[k].name+' '+have+'/'+need+'</span>';
 }).join('　');}
 /* min: 条件（消費しないが一定数いる物）の進み具合 */
 function minLine(r){
@@ -971,7 +989,7 @@ function minLine(r){
     const v=f.slice(4),j=v.lastIndexOf(':');
     const id=v.slice(0,j),need=+v.slice(j+1)||1,have=Math.floor(count(id));
     const it=ITEMS[id];
-    return '<span class="'+(have<need?'no':'')+'">'+(it?it.icon+it.name:id)+
+    return '<span class="'+(have<need?'no':'')+'">'+(it?icoI(id)+it.name:id)+
            ' '+have+'/'+need+'</span>';
   }).join('　')+'</div>';
 }
@@ -988,7 +1006,7 @@ function nodeCard(n){
     const left=full?0:Math.max(0,a.t+step-now());
     const pct=full?100:Math.max(0,Math.min(100,100-left/step*100));
     const base=tv('cd.'+n.id,n.cd),real=cdOf(S,n);
-    return '<div class="card'+(a.n?' run':'')+'"><div class="row"><div class="ico">'+n.icon+'</div>'+
+    return '<div class="card'+(a.n?' run':'')+'"><div class="row"><div class="ico">'+icoN(n)+'</div>'+
       '<div class="grow"><div class="name">'+n.name+
       (real<base?'<span class="tag t">短縮 '+real+'秒</span>':'')+
       (full?'<span class="tag s">満杯</span>':'')+'</div>'+
@@ -1013,7 +1031,7 @@ function viewArea(){
     const a=areaOf(area);
     if(!a||!areaReady(a)){area=null;return viewArea();}
     const ns=NODES.filter(n=>n.area===a.id);
-    const h=backBar('エリア','goArea(null)',a.icon,a.name);
+    const h=backBar('エリア','goArea(null)',icoA(a),a.name);
     if(!ns.length)return h+'<div class="card sub">ここでは物を採らない。'+
       '持って行った物と引き換えに、手に入らない物をもらえる（施設タブの住民）。</div>';
     const vis=ns.filter(n=>!n.requires||has(n.requires));
@@ -1023,7 +1041,7 @@ function viewArea(){
   /* 一覧: どこに何がたまっているかが分かるようにする */
   return AREAS.map(a=>{
     if(!areaReady(a))
-      return '<div class="card locked"><div class="row"><div class="ico">'+a.icon+'</div>'+
+      return '<div class="card locked"><div class="row"><div class="ico">'+icoA(a)+'</div>'+
         '<div class="grow"><div class="name q">？？？</div>'+
         '<div class="hint">'+esc(a.hint)+'</div></div></div></div>';
     const ns=NODES.filter(n=>n.area===a.id);
@@ -1031,7 +1049,7 @@ function viewArea(){
     let stock=0,full=0;
     vis.forEach(n=>{const x=accNode(n);stock+=x.n;if(x.n>=capOf(n))full++;});
     return '<div class="card'+(stock?' run':'')+'" onclick="goArea(\''+a.id+'\')">'+
-      '<div class="row"><div class="ico">'+a.icon+'</div>'+
+      '<div class="row"><div class="ico">'+icoA(a)+'</div>'+
       '<div class="grow"><div class="name">'+a.name+
       (stock?'<span class="tag t">たまり '+stock+'</span>':'')+
       (full?'<span class="tag s">満杯 '+full+'</span>':'')+'</div>'+
@@ -1051,7 +1069,7 @@ function jobCard(j,i){
   const unit=(j.u===undefined?'':(j.u+1)+'号　');
   const span=j.dur||ms(timeOf(S,r));
   const pct=done?100:Math.max(0,Math.min(100,100-left/span*100));
-  return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
+  return '<div class="card run"><div class="row"><div class="ico">'+icoI(j.station)+'</div>'+
     '<div class="grow"><div class="name">'+it.name+'</div>'+
     '<div class="sub">'+unit+ITEMS[j.station].name+upgLine(j.station,j.u)+
     '　'+(done?'完成':mmss(left))+'</div></div>'+
@@ -1062,11 +1080,11 @@ function jobCard(j,i){
 /* 空いている加工の枠。jobCard と同じ構造にして高さを合わせる */
 function upgLine(fid,i){
   const list=(UPG[fid]||[]).filter(u=>hasUpg(fid,i,u.k));
-  return list.length?list.map(u=>ITEMS[u.item].icon).join(''):'';
+  return list.length?list.map(u=>icoI(u.item)).join(''):'';
 }
 function emptySlot(f,i){
   return '<div class="card"><div class="row">'+
-    '<div class="ico" style="opacity:.3">'+f.icon+'</div>'+
+    '<div class="ico" style="opacity:.3">'+icoF(f)+'</div>'+
     '<div class="grow"><div class="name q">'+(i+1)+'号　空き</div>'+
     '<div class="sub">'+(upgLine(f.id,i)||'下の一覧から投入できる')+'</div></div>'+
     '<button disabled>待機</button></div>'+
@@ -1087,16 +1105,16 @@ function unitsGrid(f,slots){
     const up=UPG[f.id]?upgLine(f.id,i):'';
     if(!x){
       h+='<div class="plot" onclick="goUnit('+i+')">'+
-        '<div class="pi" style="opacity:.3">'+f.icon+'</div>'+
+        '<div class="pi" style="opacity:.3">'+icoF(f)+'</div>'+
         '<div class="pt">'+(i+1)+'号　空き</div>'+
         '<div class="pf">'+(up||'—')+'</div></div>';
       continue;
     }
     const r=RECIPES.find(y=>y.id===x.j.id);
-    const it=r?ITEMS[Object.keys(r.out)[0]]:null;
+    const ik=r?Object.keys(r.out)[0]:null,it=ik?ITEMS[ik]:null;
     const left=x.j.done-now(),fin=left<=0;
     h+='<div class="plot run" onclick="goUnit('+i+')">'+
-      '<div class="pi">'+(it?it.icon:f.icon)+'</div>'+
+      '<div class="pi">'+(it?icoI(ik):icoF(f))+'</div>'+
       '<div class="pt'+(fin?' good':'')+'">'+(fin?'完成':mmss(left))+'</div>'+
       '<div class="pf">'+(i+1)+'号'+(up?' '+up:'')+'</div></div>';
   }
@@ -1109,14 +1127,14 @@ function unitDetail(f,i){
   const js=jobsAt(f.id),x=js.find(y=>y.j.u===i);
   let h='<div class="row" style="margin:2px 2px 10px">'+
     '<button class="ghost" onclick="goUnit(null)">← '+f.name+'</button>'+
-    '<div class="ico">'+f.icon+'</div>'+
+    '<div class="ico">'+icoF(f)+'</div>'+
     '<div class="grow"><div class="name">'+(i+1)+'号</div></div></div>';
   h+=x?jobCard(x.j,x.i):emptySlot(f,i);
   if(UPG[f.id]){
     h+='<h2>据え付ける物</h2><div class="card">'+UPG[f.id].map(u=>{
       const has=hasUpg(f.id,i,u.k),have=Math.floor(count(u.item));
       return '<div class="row" style="padding:5px 0">'+
-        '<div class="ico">'+ITEMS[u.item].icon+'</div>'+
+        '<div class="ico">'+icoI(u.item)+'</div>'+
         '<div class="grow"><div class="name">'+ITEMS[u.item].name+
         (has?'<span class="tag t">据え付け済み</span>':'')+'</div>'+
         '<div class="sub">'+u.note+'　所持 '+have+'</div></div>'+
@@ -1134,7 +1152,7 @@ function recipeCard(r){
   const lim=limitOk(S,r);
   const can=st&&slot&&affordIn(S,inp)&&fits&&lim;
   const owned=first?Math.floor(count(first)):0,sx=stationFor(S,r);
-  return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
+  return '<div class="card"><div class="row"><div class="ico">'+(it?icoI(first):'❔')+'</div>'+
     '<div class="grow"><div class="name">'+(it?it.name:'???')+
       (it?TAGS[it.kind]:'')+(owned?'<span class="tag">所持 '+owned+'</span>':'')+
       (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
@@ -1182,7 +1200,7 @@ function passiveHtml(){
   const ks=Object.keys(ITEMS).filter(k=>count(k)>=1&&(ITEMS[k].mods||ITEMS[k].caps));
   if(!ks.length)return '';
   return '<div class="card"><div class="name">持っているだけで効く物</div>'+
-    ks.map(k=>'<div style="margin-top:6px"><div class="sub">'+ITEMS[k].icon+' '+
+    ks.map(k=>'<div style="margin-top:6px"><div class="sub">'+icoI(k)+' '+
       ITEMS[k].name+(count(k)>1?' ×'+Math.floor(count(k)):'')+'</div>'+
       modLine(ITEMS[k])+capsLine(ITEMS[k])+'</div>').join('')+'</div>';
 }
@@ -1230,7 +1248,7 @@ function viewFac(){
   if(fac){
     const f=facilities().find(x=>x.id===fac);
     if(!f){fac=null;return viewFac();}
-    let h=backBar('施設','goFac(null)',f.icon,
+    let h=backBar('施設','goFac(null)',icoF(f),
       f.name+(f.count>1?'<span class="tag s">×'+f.count+'</span>':''));
     if(f.id==='farm')return h+plotsHtml();
     if(f.kind==='storage')
@@ -1264,7 +1282,7 @@ function viewFac(){
   /* 一覧: どこで何が動いているかが一目で分かるようにする */
   return facilities().map(f=>
     '<div class="card'+(jobsAt(f.id).length?' run':'')+'" onclick="goFac(\''+f.id+'\')">'+
-    '<div class="row"><div class="ico">'+f.icon+'</div>'+
+    '<div class="row"><div class="ico">'+icoF(f)+'</div>'+
     '<div class="grow"><div class="name">'+f.name+
     (f.count>1?'<span class="tag s">×'+f.count+'</span>':'')+facStatus(f)+'</div>'+
     '<div class="sub">'+facDesc(f)+'</div></div>'+
@@ -1292,9 +1310,9 @@ function plotsHtml(){
     const full=p.n>=cap,left=full?0:Math.max(0,p.at+step-now());
     const f=fertOf(p);
     return '<div class="plot'+(p.n?' run':'')+'" onclick="goPlot('+i+')">'+
-      '<div class="pi">'+(p.n?cr.icon:cr.seed)+'</div>'+
+      '<div class="pi">'+(p.n?icoC(k):icoS(k))+'</div>'+
       '<div class="pt'+(full?' warn':'')+'">'+(p.n?p.n+' / '+cap+'回':mmss(left))+'</div>'+
-      '<div class="pf">'+(f?ITEMS[p.fert].icon+' '+ITEMS[p.fert].name:'—')+'</div></div>';
+      '<div class="pf">'+(f?icoI(p.fert)+' '+ITEMS[p.fert].name:'—')+'</div></div>';
   }).join('')+'</div><div class="sub" style="margin:8px 2px">'+
   '区画をタップすると、育てる物と入れる物を選べる。'+
   '収穫しなくても '+cap+'回分までたまり、一度植えれば植え直しはいらない。</div>';
@@ -1311,7 +1329,7 @@ function plotDetail(i){
     const step=ms(plotGrow(p,k)),full=p.n>=cap;
     const left=full?0:Math.max(0,p.at+step-now());
     const per=plotYield(p,k),f=fertOf(p);
-    h+='<div class="card run"><div class="row"><div class="ico">'+(p.n?cr.icon:cr.seed)+'</div>'+
+    h+='<div class="card run"><div class="row"><div class="ico">'+(p.n?icoC(k):icoS(k))+'</div>'+
       '<div class="grow"><div class="name">'+cr.name+
       (f?'<span class="tag t">'+ITEMS[p.fert].name+'</span>':'')+'</div>'+
       '<div class="sub">'+dur(plotGrow(p,k))+'で'+per+'個　'+
@@ -1323,7 +1341,7 @@ function plotDetail(i){
   }else h+='<div class="card sub">まだ何も植えていない。</div>';
   const open=Object.keys(CROPS).filter(x=>cropOpen(S,x));
   h+='<h2>育てる物</h2><div class="card">'+open.map(x=>
-    '<div class="row" style="padding:5px 0"><div class="ico">'+CROPS[x].icon+'</div>'+
+    '<div class="row" style="padding:5px 0"><div class="ico">'+icoC(x)+'</div>'+
     '<div class="grow"><div class="name">'+CROPS[x].name+'</div>'+
     '<div class="sub">'+dur(growOf(S,x))+'で'+cropYield(S,x)+'個</div></div>'+
     '<button class="alt" onclick="replant('+i+',\''+x+'\')"'+
@@ -1331,7 +1349,7 @@ function plotDetail(i){
   ).join('')+'</div>';
   h+='<h2>入れる物</h2><div class="card">'+Object.keys(FERT).map(x=>{
     const have=Math.floor(count(x)),on=!!p&&p.fert===x;
-    return '<div class="row" style="padding:5px 0"><div class="ico">'+ITEMS[x].icon+'</div>'+
+    return '<div class="row" style="padding:5px 0"><div class="ico">'+icoI(x)+'</div>'+
       '<div class="grow"><div class="name">'+ITEMS[x].name+
       (on?'<span class="tag t">入っている</span>':'')+'</div>'+
       '<div class="sub">'+FERT[x].note+'　所持 '+have+'</div></div>'+
@@ -1347,7 +1365,7 @@ function viewCodex(){
   return vis.map(r=>{
     const first=Object.keys(r.out)[0],it=ITEMS[first];
     if(ok(r.unlock))return '<div class="card"><div class="row">'+
-      '<div class="ico">'+(it?it.icon:'❔')+'</div><div class="grow">'+
+      '<div class="ico">'+(it?icoI(first):'❔')+'</div><div class="grow">'+
       '<div class="name">'+(it?it.name:'???')+(it?TAGS[it.kind]:'')+
       (r.time?'<span class="tag s">'+timeOf(S,r)+'秒</span>':'')+'</div>'+
       '<div class="cost">'+costLine(inputsOf(r))+'</div>'+modLine(it)+'</div></div></div>';
@@ -1365,14 +1383,14 @@ function num(key,def,unit){
 function viewTune(){
   let h='<div class="card"><h2 style="margin-top:0">採取ノード</h2>';
   NODES.forEach(n=>{const k=Object.keys(n.yield)[0];
-    h+='<div class="tr"><div class="tl">'+n.icon+' '+n.name+' 待ち時間</div>'+num('cd.'+n.id,n.cd,'秒')+'</div>'+
+    h+='<div class="tr"><div class="tl">'+icoN(n)+' '+n.name+' 待ち時間</div>'+num('cd.'+n.id,n.cd,'秒')+'</div>'+
        '<div class="tr"><div class="tl">　└ 取得数 最小／最大</div>'+
        num('y0.'+n.id,n.yield[k][0],'')+num('y1.'+n.id,n.yield[k][1],'個')+'</div>'+
        '<div class="tr"><div class="tl">　└ 放置でたまる上限（約'+
        dur(cdOf(S,n)*capOf(n))+'で満杯）</div>'+num('cap.'+n.id,CAP_NODE,'回')+'</div>';});
   h+='</div><div class="card"><h2 style="margin-top:0">作物</h2>';
   Object.keys(CROPS).forEach(k=>{const cr=CROPS[k];
-    h+='<div class="tr"><div class="tl">'+cr.icon+' '+cr.name+' 成長時間</div>'+
+    h+='<div class="tr"><div class="tl">'+icoC(k)+' '+cr.name+' 成長時間</div>'+
        num('grow.'+k,cr.grow,'秒')+'</div>'+
        '<div class="tr"><div class="tl">　└ 1区画の収穫量</div>'+
        num('cy.'+k,cr.yield,'個')+'</div>';});
@@ -1381,13 +1399,13 @@ function viewTune(){
      num('cap.plot',CAP_PLOT,'回')+'</div></div>';
 
   h+='<div class="card"><h2 style="margin-top:0">加工時間</h2>';
-  RECIPES.filter(r=>r.time).forEach(r=>{const it=ITEMS[Object.keys(r.out)[0]];
-    h+='<div class="tr"><div class="tl">'+it.icon+' '+it.name+'</div>'+num('time.'+r.id,r.time,'秒')+'</div>';});
+  RECIPES.filter(r=>r.time).forEach(r=>{const ik=Object.keys(r.out)[0],it=ITEMS[ik];
+    h+='<div class="tr"><div class="tl">'+icoI(ik)+' '+it.name+'</div>'+num('time.'+r.id,r.time,'秒')+'</div>';});
   h+='</div><div class="card"><h2 style="margin-top:0">レシピ必要数</h2>';
   RECIPES.filter(r=>!r.unlock.includes('never')).forEach(r=>{
     const first=Object.keys(r.out)[0],it=ITEMS[first];
-    h+='<div class="tr"><div class="tl">'+(it?it.icon+' '+it.name:r.id)+'</div>'+
-      Object.keys(r.inputs).map(k=>num('in.'+r.id+'.'+k,r.inputs[k],ITEMS[k].icon)).join('')+'</div>';});
+    h+='<div class="tr"><div class="tl">'+(it?icoI(first)+' '+it.name:r.id)+'</div>'+
+      Object.keys(r.inputs).map(k=>num('in.'+r.id+'.'+k,r.inputs[k],icoI(k))).join('')+'</div>';});
   h+='</div><div class="card"><h2 style="margin-top:0">収納</h2>'+
      '<div class="tr"><div class="tl">📦 初期の置ける量（素材1種あたり）</div>'+
      num('cap.base',CAP_BASE,'個')+'</div>'+
@@ -1477,11 +1495,11 @@ function buildWelcome(away){
   if(away<300000)return null;          /* 5分未満なら出さない */
   const rows=[];
   NODES.filter(nodeOpen).forEach(n=>{
-    const a=accNode(n);if(a.n>0)rows.push(n.icon+n.name+'×'+a.n);});
+    const a=accNode(n);if(a.n>0)rows.push(icoN(n)+n.name+'×'+a.n);});
   const crop={};
   S.plots.forEach(p=>{if(!p||!p.n)return;const k=CROPS[p.crop]?p.crop:'wheat';
     crop[k]=(crop[k]||0)+p.n*plotYield(p,k);});
-  Object.keys(crop).forEach(k=>rows.push(CROPS[k].icon+CROPS[k].name+'×'+crop[k]));
+  Object.keys(crop).forEach(k=>rows.push(icoC(k)+CROPS[k].name+'×'+crop[k]));
   const dn=S.jobs.filter(j=>now()>=j.done).length;
   if(dn>0)rows.push('🔥加工×'+dn+'（完成）');
   return rows.length?{away:away,rows:rows}:null;
@@ -1510,7 +1528,7 @@ function render(){
         const cap=invCap(S,k);
         /* 上限が近いときだけ分母を出す。普段は数字だけで読みやすく保つ */
         return '<div class="chip'+(mat?'':' st')+(mat&&c>=cap?' full':'')+'">'+
-          ITEMS[k].icon+' <b>'+c+'</b>'+
+          icoI(k)+' <b>'+c+'</b>'+
           (mat&&c>=cap*0.8?'<span class="cp">/'+cap+'</span>':'')+'</div>';
       }).join('')
     : '<div class="empty">持ち物なし。採取から始める。</div>';
