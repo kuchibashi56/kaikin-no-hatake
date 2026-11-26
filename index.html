@@ -956,9 +956,14 @@ function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
    並んでいない物はこれまでどおり絵文字で出る。混ざっても崩れない。
    例: const ART=['item.stone','node.ore','area.cave']; */
 const ART=[];
+const ART_BAD={};
+/* 読めなかった絵は覚えておき、次からは絵文字で描く。
+   0.5秒ごとに描き直すので、覚えないと毎回空き枠が出てしまう */
+function artBad(k){if(!ART_BAD[k]){ART_BAD[k]=1;render();}}
 function art(key,emoji){
-  return ART.indexOf(key)<0?(emoji||'❔')
-    :'<img class="ic" src="img/'+key.replace('.','/')+'.png" alt="">';
+  if(ART.indexOf(key)<0||ART_BAD[key])return emoji||'❔';
+  return '<img class="ic" src="img/'+key.replace('.','/')+'.png" alt="'+(emoji||'')+
+    '" onerror="artBad(&quot;'+key+'&quot;)">';
 }
 const icoI=k=>art('item.'+k,(ITEMS[k]||{}).icon);            /* 物 */
 const icoN=x=>art('node.'+x.id,x.icon);                      /* 採取場所 */
