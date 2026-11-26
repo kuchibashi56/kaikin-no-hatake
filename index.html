@@ -207,8 +207,8 @@ const ITEMS={
   farm:     {name:'畑',      icon:'🟩',kind:'plot'},
   crate:    {name:'収納箱',  icon:'📦',kind:'storage'},
   vault:    {name:'石蔵',    icon:'🏯',kind:'storage'},
-  bellows:  {name:'ふいご',  icon:'💨',kind:'station',
-             mods:[{k:'time.iron',mul:0.6},{k:'time.charcoal',mul:0.7}]},
+  bellows:  {name:'ふいご',  icon:'💨',kind:'material'},
+  firebrick:{name:'耐火レンガ',icon:'🟥',kind:'material'},
   compost:  {name:'堆肥箱',  icon:'♻',kind:'station'},
   pantry:   {name:'保存食棚',icon:'🍱',kind:'station',
              caps:[{cat:'food',add:60}]},
@@ -352,7 +352,11 @@ const RECIPES=[
   {id:'lantern',out:{lantern:1},inputs:{glass:2,iron:1,charcoal:1},station:['workbench'],
    unlock:['got:glass'],reveal:['got:glass'],hint:'暗い所を照らす物'},
   {id:'bellows',out:{bellows:1},inputs:{iron:2,plank:4,glass:1},station:['workbench'],
-   unlock:['got:glass'],reveal:['got:glass'],hint:'炉に風を送る物'},
+   unlock:['got:glass'],reveal:['got:glass'],hint:'炉に据え付けて風を送る物'},
+  {id:'firebrick',out:{firebrick:2},inputs:{clay:4,sand:4,stone:6},station:['furnace'],time:160,
+   unlock:['got:brick'],reveal:['got:brick'],hint:'高い温度に耐える、炉に積む物'},
+  {id:'steelself',out:{steel:2},inputs:{iron:5,charcoal:4},station:['furnace'],time:300,hot:true,
+   unlock:['got:firebrick'],reveal:['got:firebrick'],hint:'よほど高い温度でないと打てない'},
   {id:'compost',out:{compost:1},inputs:{plank:4,stone:6,water:2},
    station:['workbench'],
    unlock:['got:water'],reveal:['got:farm'],hint:'有機物を寝かせておく箱'},
@@ -460,6 +464,12 @@ const RECIPES=[
    unlock:['never'],reveal:['got:charm'],hint:'さらに先の何か … まだ作れない'},
 ];
 
+/* 施設の個体に据え付ける物。据え付けたその1台だけに効く */
+const UPG={furnace:[
+  {k:'bellows',  item:'bellows',  mul:0.6,  note:'この炉の加工が速くなる'},
+  {k:'firebrick',item:'firebrick',hot:true, note:'高い温度が要る物を扱えるようになる'},
+]};
+
 /* 区画に入れる物。入れた区画だけに効き、植え替えると無くなる */
 const FERT={
   bark:  {grow:0.85,yield:0, note:'土が乾きにくくなり、早く育つ'},
@@ -504,8 +514,8 @@ const KEY='kuchibashi-craft-v3';
 /* セーブの版。形を変えたら上げて、migrate に移行を書き足す。
    fresh に v を入れないのは、版を持たない古いセーブを
    Object.assign した時に「新しい版」と誤認しないため */
-const SAVE_V=3;
-const fresh=()=>({inv:{},flags:{},acc:{},plots:[],jobs:[],scale:1,tune:{},lastSeen:0});
+const SAVE_V=4;
+const fresh=()=>({inv:{},flags:{},acc:{},plots:[],jobs:[],units:{},scale:1,tune:{},lastSeen:0});
 
 /* セーブの形を今の版にそろえる。起動時と取り込み時の両方から通す */
 function migrate(){
@@ -528,6 +538,15 @@ function migrate(){
   /* 無くなったレシピや設備を指しているジョブは捨てる。
      残したまま描こうとすると画面ごと落ちるため */
   S.jobs=(S.jobs||[]).filter(j=>j&&ITEMS[j.station]&&RECIPES.some(r=>r.id===j.id));
+  if(!S.units||typeof S.units!=='object')S.units={};
+  /* v3 以前: ジョブがどの1台で動いているかを持っていなかった。
+     同じ設備の中で空いている番号に順に割り当てる */
+  S.jobs.forEach(j=>{
+    if(j.u!==undefined)return;
+    const taken=S.jobs.filter(x=>x.station===j.station&&x.u!==undefined).map(x=>x.u);
+    let i=0;while(taken.indexOf(i)>=0)i++;
+    j.u=i;
+  });
   /* 時間倍率は開発用。保存された値をそのまま使うと、不在中の蓄積まで
      倍率ぶん進んでしまうため、起動時は必ず等倍に戻す */
   S.scale=1;
@@ -576,6 +595,8 @@ const plotGrow=(p,k)=>{const f=fertOf(p);
 const plotYield=(p,k)=>{const f=fertOf(p);
   return Math.max(0,cropYield(S,k)+(f?f.yield:0));};
 const timeOf=(c,r)=>r.time?eff(c,'time.'+r.id,r.time,1):0;
+/* 実際にその炉で焼いたときの秒数 */
+const timeAt=(r,fid,i)=>Math.max(1,Math.round(timeOf(S,r)*unitMul(fid,i)));
 const inputsOf=r=>{const o={};for(const k in r.inputs)o[k]=tv('in.'+r.id+'.'+k,r.inputs[k]);return o;};
 
 function flagOk(c,f){
@@ -664,10 +685,58 @@ const FULLMSG='📦 置き場がない。収納箱を作ると増える';
 const stationFor=(c,r)=>r.station?(r.station.find(s=>cnt(c,s)>=1)||null):null;
 const stationOk=(c,r)=>!r.station||!!stationFor(c,r);
 const busyAt=(c,s)=>(c.jobs||[]).filter(j=>j.station===s).length;
+
+/* --- 施設の個体。畑の区画と同じ考え方で、1台ずつ状態を持つ --- */
+function syncUnits(fid){
+  if(!S.units)S.units={};
+  const want=Math.floor(count(fid));
+  const a=S.units[fid]||(S.units[fid]=[]);
+  while(a.length<want)a.push({up:{}});
+  while(a.length>want)a.pop();
+  return a;
+}
+const unitAt=(fid,i)=>{const a=(S.units&&S.units[fid])||[];return a[i];};
+const hasUpg=(fid,i,k)=>{const u=unitAt(fid,i);return !!(u&&u.up&&u.up[k]);};
+const unitMul=(fid,i)=>{let m=1;
+  (UPG[fid]||[]).forEach(u=>{if(u.mul&&hasUpg(fid,i,u.k))m*=u.mul;});return m;};
+const unitHot=(fid,i)=>(UPG[fid]||[]).some(u=>u.hot&&hasUpg(fid,i,u.k));
+const unitBusy=(c,fid,i)=>(c.jobs||[]).some(j=>j.station===fid&&j.u===i);
+/* 空いている1台を探す。高温が要る加工は、耐火レンガを積んだ炉だけ */
+function freeUnit(fid,needHot){
+  const n=Math.floor(count(fid));
+  for(let i=0;i<n;i++){
+    if(unitBusy(S,fid,i))continue;
+    if(needHot&&!unitHot(fid,i))continue;
+    return i;
+  }
+  return -1;
+}
+/* シミュレーターは理想プレイなので、持っていれば据え付けた扱いにする */
+const ctxHot=(c,fid)=>{
+  if(c!==S)return cnt(c,'firebrick')>=1;
+  const n=Math.floor(count(fid));
+  for(let i=0;i<n;i++)if(unitHot(fid,i))return true;
+  return false;
+};
 function slotOk(c,r){
   if(!r.time)return true;
   const s=stationFor(c,r);
-  return !!s&&busyAt(c,s)<cnt(c,s);
+  if(!s)return false;
+  if(r.hot&&!ctxHot(c,s))return false;
+  if(c!==S)return busyAt(c,s)<cnt(c,s);
+  return freeUnit(s,!!r.hot)>=0;
+}
+function installUpg(fid,i,k){
+  const spec=(UPG[fid]||[]).find(x=>x.k===k);
+  if(!spec)return;
+  syncUnits(fid);
+  const u=unitAt(fid,i);
+  if(!u){toast('その設備がない');return;}
+  if(u.up[k]){toast('もう据え付けてある');return;}
+  if(count(spec.item)<1){toast(ITEMS[spec.item].name+'がない');return;}
+  S.inv[spec.item]=count(spec.item)-1;
+  u.up[k]=1;save();renderKeep();
+  toast(ITEMS[spec.item].icon+' 据え付けた');
 }
 
 /* --- 本体 --- */
@@ -709,7 +778,12 @@ function craft(r){
   if(!r.time&&!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in inp)S.inv[k]=count(k)-inp[k];
   if(r.time){
-    S.jobs.push({id:r.id,station:stationFor(S,r),done:now()+ms(timeOf(S,r))});
+    const st=stationFor(S,r);
+    syncUnits(st);
+    const u=freeUnit(st,!!r.hot);
+    if(u<0){toast('空いている'+ITEMS[st].name+'がない');return;}
+    const span=ms(timeAt(r,st,u));
+    S.jobs.push({id:r.id,station:st,u:u,dur:span,done:now()+span});
     toast('🔥 投入した');
   }else{
     const names=[];
@@ -949,22 +1023,58 @@ function jobCard(j,i){
   if(!r||!ITEMS[j.station])return '';
   const k=Object.keys(r.out)[0],it=ITEMS[k];
   const left=j.done-now(),done=left<=0;
-  const pct=done?100:100-left/ms(timeOf(S,r))*100;
+  const unit=(j.u===undefined?'':(j.u+1)+'号　');
+  const span=j.dur||ms(timeOf(S,r));
+  const pct=done?100:Math.max(0,Math.min(100,100-left/span*100));
   return '<div class="card run"><div class="row"><div class="ico">'+ITEMS[j.station].icon+'</div>'+
     '<div class="grow"><div class="name">'+it.name+'</div>'+
-    '<div class="sub">'+ITEMS[j.station].name+'　'+(done?'完成':mmss(left))+'</div></div>'+
+    '<div class="sub">'+unit+ITEMS[j.station].name+upgLine(j.station,j.u)+
+    '　'+(done?'完成':mmss(left))+'</div></div>'+
     '<button onclick="collect('+i+')"'+(done?'':' disabled')+'>'+
     (done?'受け取る':'加工中')+'</button></div>'+
     '<div class="bar gold"><i style="width:'+pct+'%"></i></div></div>';
 }
 /* 空いている加工の枠。jobCard と同じ構造にして高さを合わせる */
-function emptySlot(f){
+function upgLine(fid,i){
+  const list=(UPG[fid]||[]).filter(u=>hasUpg(fid,i,u.k));
+  return list.length?list.map(u=>ITEMS[u.item].icon).join(''):'';
+}
+function emptySlot(f,i){
   return '<div class="card"><div class="row">'+
     '<div class="ico" style="opacity:.3">'+f.icon+'</div>'+
-    '<div class="grow"><div class="name q">空き</div>'+
-    '<div class="sub">下の一覧から投入できる</div></div>'+
+    '<div class="grow"><div class="name q">'+(i+1)+'号　空き</div>'+
+    '<div class="sub">'+(upgLine(f.id,i)||'下の一覧から投入できる')+'</div></div>'+
     '<button disabled>待機</button></div>'+
     '<div class="bar"><i style="width:0"></i></div></div>';
+}
+/* 1台ずつの手入れ。据え付けた物はその台だけに効く */
+function unitsHtml(f){
+  syncUnits(f.id);
+  const n=Math.floor(count(f.id));
+  let h='';
+  for(let i=0;i<n;i++){
+    const busy=unitBusy(S,f.id,i);
+    const on=UPG[f.id].filter(u=>hasUpg(f.id,i,u.k));
+    h+='<div class="card'+(on.length?' run':'')+'"><div class="row">'+
+      '<div class="ico">'+f.icon+'</div>'+
+      '<div class="grow"><div class="name">'+f.name+' '+(i+1)+'号'+
+      (busy?'<span class="tag s">稼働中</span>':'')+'</div>'+
+      '<div class="sub">'+(on.length
+        ? on.map(u=>ITEMS[u.item].icon+ITEMS[u.item].name).join('　')
+        : 'まだ何も据え付けていない')+'</div></div></div>'+
+      UPG[f.id].map(u=>{
+        const has=hasUpg(f.id,i,u.k),have=Math.floor(count(u.item));
+        return '<div class="row" style="margin-top:8px">'+
+          '<div class="ico">'+ITEMS[u.item].icon+'</div>'+
+          '<div class="grow"><div class="name">'+ITEMS[u.item].name+
+          (has?'<span class="tag t">据え付け済み</span>':'')+'</div>'+
+          '<div class="sub">'+u.note+'　所持 '+have+'</div></div>'+
+          '<button class="alt" onclick="installUpg(\''+f.id+'\','+i+',\''+u.k+'\')"'+
+          ((has||have<1)?' disabled':'')+'>据え付ける</button></div>';
+      }).join('')+'</div>';
+  }
+  return h+'<div class="sub" style="margin:4px 2px">'+
+    '据え付けた物はその1台だけに効き、取り外しはできない。</div>';
 }
 function recipeCard(r){
   const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
@@ -1091,10 +1201,17 @@ function viewFac(){
           '作る'+(rs.length?' '+rs.length:'')+'</button>'+
         '<button class="'+(facView==='run'?'on':'')+'" onclick="goFacView(\'run\')">'+
           '稼働 '+js.length+' / '+slots+
-          (done?'<span class="badge">'+done+'</span>':'')+'</button></div>';
+          (done?'<span class="badge">'+done+'</span>':'')+'</button>'+
+        (UPG[f.id]?'<button class="'+(facView==='gear'?'on':'')+
+          '" onclick="goFacView(\'gear\')">手入れ</button>':'')+'</div>';
+      if(facView==='gear'&&UPG[f.id])return h+unitsHtml(f);
       if(facView==='run'){
-        /* 受け取っても枠は消さず空きにする。下の枠がせり上がらない */
-        for(let i=0;i<slots;i++)h+=js[i]?jobCard(js[i].j,js[i].i):emptySlot(f);
+        /* 受け取っても枠は消さず空きにする。下の枠がせり上がらない。
+           並びは何台目かで固定し、どの炉が動いているか分かるようにする */
+        for(let i=0;i<slots;i++){
+          const x=js.find(y=>y.j.u===i);
+          h+=x?jobCard(x.j,x.i):emptySlot(f,i);
+        }
         return h;
       }
     }
