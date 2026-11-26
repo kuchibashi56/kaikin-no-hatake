@@ -419,5 +419,26 @@ for k, f in FERT.items():
 w('')
 w('肥料は区画ごとに入れる。1区画に1種類まで。')
 
+# ---------------- 内部の名前 ----------------
+# 外からこの一覧を使うとき（画像を作って差し替えるときなど）は、
+# ゲームが内部で使っている名前が要る。
+w('')
+w('## 内部の名前（%d）' % len(ITEMS))
+w('')
+w('ゲームの中でそれぞれの物を指している名前。画面に出る名前とは別で、')
+w('画像を用意するときのファイル名などに使える。')
+w('')
+for kind in ['material', 'tool', 'station', 'plot', 'storage', 'villager']:
+    ks = [k for k, it in ITEMS.items() if it['kind'] == kind]
+    if not ks:
+        continue
+    w('**%s（%d）**' % (KINDJA[kind], len(ks)))
+    w('')
+    w('```')
+    for k in ks:
+        w('%-10s %s %s' % (k, ITEMS[k]['icon'], ITEMS[k]['name']))
+    w('```')
+    w('')
+
 io.open('ITEMS.md', 'w', encoding='utf-8', newline='\n').write('\n'.join(L) + '\n')
 print('ITEMS.md written:', len(L), 'lines')

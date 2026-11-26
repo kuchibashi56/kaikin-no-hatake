@@ -183,3 +183,120 @@ index.html のデータ層（ITEMS / NODES / RECIPES / CROPS / FERT / UPG）か�
 | 🍂 | 堆肥 | ×1 | +2 | よく肥えて、採れる量が増える |
 
 肥料は区画ごとに入れる。1区画に1種類まで。
+
+## 内部の名前（81）
+
+ゲームの中でそれぞれの物を指している名前。画面に出る名前とは別で、
+画像を用意するときのファイル名などに使える。
+
+**素材（54）**
+
+```
+branch     🌿 枝
+stone      🪨 石
+log        🪵 丸太
+plank      🟫 板材
+wheat      🌾 麦
+flour      🏺 小麦粉
+sawdust    🟨 木くず
+dung       💩 厩肥
+bark       🍁 バークチップ
+manure     🍂 堆肥
+bread      🍞 パン
+potato     🥔 じゃがいも
+baked      🍠 焼き芋
+berry      🫐 木の実
+herb       🍃 薬草
+cobweb     🕸 クモの巣
+cuore      🔶 銅鉱石
+copper     🟠 銅
+thread     🧵 糸
+cloth      🧶 布
+rope       🪢 縄
+meat       🍖 生肉
+hide       🧳 毛皮
+fish       🐟 海魚
+riverfish  🐠 川魚
+cavefish   🐡 洞窟魚
+himono     🍥 干物
+salt       🧂 塩
+spice      🌶 香辛料
+feed       🪴 飼葉
+cage       🧺 生け捕りの檻
+trap       🪤 罠
+egg        🥚 卵
+milk       🥛 乳
+cheese     🧀 チーズ
+jerky      🥓 干し肉
+soup       🍲 野菜スープ
+pie        🥧 木の実のパイ
+grilled    🍢 焼き魚
+cornbread  🫓 コーンブレッド
+fame       🎖 評判
+steel      🔗 鋼
+cseed      🌰 珍しい種
+corn       🌽 とうもろこし
+ore        🧱 鉱石
+iron       🔩 鉄
+sand       🏜 砂
+water      💧 水
+charcoal   ⬛ 木炭
+glass      🫙 ガラス
+clay       🟤 粘土
+brick      🟧 レンガ
+bellows    💨 ふいご
+firebrick  🟥 耐火レンガ
+```
+
+**道具（12）**
+
+```
+stone_axe  🪓 石の斧
+pickaxe    ⛏ 石のツルハシ
+iron_axe   ⚒ 鉄の斧
+shovel     🥄 木のシャベル
+bucket     🪣 木のバケツ
+lantern    🏮 ランタン
+rod        🎣 釣竿
+rod2       🪝 丈夫な釣竿
+cart       🛒 荷車
+boat       🛶 小舟
+steeltool  🧰 鋼の道具一式
+charm      🧿 守り袋
+```
+
+**設備（9）**
+
+```
+workbench  🛠 作業台
+mill       ⚙️ 粉引き機
+furnace    🔥 炉
+compost    ♻ 堆肥箱
+pantry     🍱 保存食棚
+loom       🪡 織機
+kitchen    🍳 調理場
+chicken    🐔 鶏
+goat       🐐 山羊
+```
+
+**区画（1）**
+
+```
+farm       🟩 畑
+```
+
+**収納（2）**
+
+```
+crate      📦 収納箱
+vault      🏯 石蔵
+```
+
+**住民（3）**
+
+```
+trader     🛍 行商人
+smith      🔨 鍛冶屋
+herbalist  🧪 薬師
+```
+
