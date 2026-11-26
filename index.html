@@ -264,9 +264,9 @@ const NODES=[
    yield:{water:[1,2]}, desc:'桶で水を汲む'},
 
   {id:'ore',   name:'鉱脈', icon:'🗻',cd:180,area:'cave',  requires:'have:pickaxe',
-   yield:{ore:[1,2]},   desc:'ツルハシで削り出す'},
+   yield:{ore:[2,3]},   desc:'ツルハシで削り出す'},
   {id:'web',   name:'巣穴', icon:'🕸',cd:100,area:'cave',  requires:'have:lantern',
-   yield:{cobweb:[2,3]},desc:'灯りがないと奥は見えない'},
+   yield:{cobweb:[3,5]},desc:'灯りがないと奥は見えない'},
   {id:'cuvein',name:'銅脈', icon:'🔶',cd:200,area:'cave',  requires:'have:lantern',
    yield:{cuore:[1,2]}, desc:'赤みがかった筋を削る'},
 
@@ -299,6 +299,8 @@ const RECIPES=[
    unlock:['got:plank'],reveal:['got:workbench'],hint:'しまっておく物。置ける量が増える'},
   {id:'sawdust',out:{sawdust:3},inputs:{branch:5},station:['mill'],time:50,
    unlock:['got:mill'],reveal:['got:mill'],hint:'枝を挽くと出る細かい物'},
+  {id:'grit',out:{sand:3},inputs:{stone:4},station:['mill'],time:70,
+   unlock:['got:shovel'],reveal:['got:mill'],hint:'石を挽くと細かい粒になる'},
   {id:'dustcoal',out:{charcoal:1},inputs:{sawdust:6},station:['furnace'],time:80,
    unlock:['got:sawdust'],reveal:['got:sawdust'],hint:'木くずをまとめて蒸し焼きにする'},
   {id:'mill',out:{mill:1},inputs:{wheat:12,plank:6},station:['workbench'],
