@@ -1,7 +1,7 @@
 /* 解禁の畑 — service worker
    ゲームを更新したら、次行の版番号を1つ上げてから push すること。
    版番号を上げないと、端末側は古いキャッシュを返し続ける。 */
-const CACHE = 'kaikin-v18';
+const CACHE = 'kaikin-v19';
 const ASSETS = [
   './',
   './index.html',

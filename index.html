@@ -66,6 +66,10 @@
   .plot .pi{font-size:24px;line-height:1.3}
   .plot .pt{font-size:11px;color:#8d8275;font-variant-numeric:tabular-nums;min-height:15px}
   .plot button{width:100%;padding:6px 0;font-size:12.5px;margin-top:6px}
+  .plot .pf{font-size:11px;color:#8d8275;margin-top:6px;min-height:15px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .plot[onclick]{cursor:pointer}
+  .plot.run{border-color:#4a3f28;background:#241d14}
   .plot .seeds{display:flex;gap:4px;margin-top:6px}
   .plot .seeds button{flex:1 1 0;width:auto;min-width:0;margin-top:0;padding:5px 0;
     font-size:15px;background:#2a241e;border-color:#3a322a;color:#e8e0d4}
@@ -143,6 +147,9 @@ const ITEMS={
   wheat: {name:'麦',    icon:'🌾',kind:'material',cat:'food'},
   flour: {name:'小麦粉',icon:'🏺',kind:'material'},
   sawdust:{name:'木くず',icon:'🟨',kind:'material'},
+  dung:   {name:'厩肥',  icon:'💩',kind:'material'},
+  bark:   {name:'バークチップ',icon:'🍁',kind:'material'},
+  manure: {name:'堆肥',  icon:'🍂',kind:'material'},
   bread: {name:'パン',  icon:'🍞',kind:'material',cat:'food'},
   potato:{name:'じゃがいも',icon:'🥔',kind:'material',cat:'food'},
   baked: {name:'焼き芋',icon:'🍠',kind:'material',cat:'food'},
@@ -202,8 +209,7 @@ const ITEMS={
   vault:    {name:'石蔵',    icon:'🏯',kind:'storage'},
   bellows:  {name:'ふいご',  icon:'💨',kind:'station',
              mods:[{k:'time.iron',mul:0.6},{k:'time.charcoal',mul:0.7}]},
-  compost:  {name:'堆肥箱',  icon:'🍂',kind:'station',
-             mods:[{k:'grow.wheat',mul:0.75},{k:'cy.wheat',add:1}]},
+  compost:  {name:'堆肥箱',  icon:'♻',kind:'station'},
   pantry:   {name:'保存食棚',icon:'🍱',kind:'station',
              caps:[{cat:'food',add:60}]},
   loom:     {name:'織機',    icon:'🪡',kind:'station'},
@@ -347,9 +353,13 @@ const RECIPES=[
    unlock:['got:glass'],reveal:['got:glass'],hint:'暗い所を照らす物'},
   {id:'bellows',out:{bellows:1},inputs:{iron:2,plank:4,glass:1},station:['workbench'],
    unlock:['got:glass'],reveal:['got:glass'],hint:'炉に風を送る物'},
-  {id:'compost',out:{compost:1},inputs:{plank:4,wheat:8,potato:6,water:2},
+  {id:'compost',out:{compost:1},inputs:{plank:4,stone:6,water:2},
    station:['workbench'],
-   unlock:['got:water'],reveal:['got:farm'],hint:'畑に入れると早く育つ物'},
+   unlock:['got:water'],reveal:['got:farm'],hint:'有機物を寝かせておく箱'},
+  {id:'bark',out:{bark:2},inputs:{sawdust:4},station:['compost'],time:90,
+   unlock:['got:compost'],reveal:['got:compost'],hint:'木くずを寝かせた、土を覆う物'},
+  {id:'manure',out:{manure:2},inputs:{dung:3,sawdust:2,water:1},station:['compost'],time:150,
+   unlock:['got:dung'],reveal:['got:compost'],hint:'厩肥を寝かせて作る、よく効く土'},
   {id:'vault',out:{vault:1},inputs:{brick:8,stone:14,plank:6},station:['workbench'],
    unlock:['got:brick'],reveal:['got:brick'],hint:'たくさんしまえる、大きな物'},
   {id:'baked',out:{baked:1},inputs:{potato:3,charcoal:1},station:['furnace'],time:100,
@@ -392,9 +402,9 @@ const RECIPES=[
    unlock:['got:cage'],reveal:['got:cage'],hint:'手なずけると、毎日なにか産む'},
   {id:'goat',out:{goat:1},inputs:{cage:1,feed:8,herb:4},station:['workbench'],
    unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏より気難しい'},
-  {id:'egg',out:{egg:2},inputs:{feed:3},station:['chicken'],time:360,
+  {id:'egg',out:{egg:2,dung:1},inputs:{feed:3},station:['chicken'],time:360,
    unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏に飼葉を与えて待つ'},
-  {id:'milk',out:{milk:2},inputs:{feed:4,herb:2},station:['goat'],time:540,
+  {id:'milk',out:{milk:2,dung:2},inputs:{feed:4,herb:2},station:['goat'],time:540,
    unlock:['got:goat'],reveal:['got:goat'],hint:'山羊に飼葉と薬草を与えて待つ'},
 
   /* ---- 集落との交易。station なしで、材料を渡して受け取る ---- */
@@ -449,6 +459,12 @@ const RECIPES=[
   {id:'frontier',out:{},inputs:{cornbread:2,steel:2,spice:2},station:['workbench'],
    unlock:['never'],reveal:['got:charm'],hint:'さらに先の何か … まだ作れない'},
 ];
+
+/* 区画に入れる物。入れた区画だけに効き、植え替えると無くなる */
+const FERT={
+  bark:  {grow:0.85,yield:0, note:'土が乾きにくくなり、早く育つ'},
+  manure:{grow:1,   yield:2, note:'よく肥えて、採れる量が増える'},
+};
 
 /* unlock: 'start' か flagOk が読める条件。畑に植えられるようになる条件 */
 const CROPS={
@@ -553,6 +569,12 @@ const cropOf=k=>CROPS[k]||CROPS.wheat;
 const growOf=(c,k)=>eff(c,'grow.'+(CROPS[k]?k:'wheat'),cropOf(k).grow,1);
 const cropYield=(c,k)=>eff(c,'cy.'+(CROPS[k]?k:'wheat'),cropOf(k).yield,0);
 const cropOpen=(c,k)=>cropOf(k).unlock==='start'||flagOk(c,cropOf(k).unlock);
+/* 区画に入っている物を重ねた、その区画だけの値 */
+const fertOf=p=>(p&&p.fert&&FERT[p.fert])?FERT[p.fert]:null;
+const plotGrow=(p,k)=>{const f=fertOf(p);
+  return Math.max(1,Math.round(growOf(S,k)*(f?f.grow:1)));};
+const plotYield=(p,k)=>{const f=fertOf(p);
+  return Math.max(0,cropYield(S,k)+(f?f.yield:0));};
 const timeOf=(c,r)=>r.time?eff(c,'time.'+r.id,r.time,1):0;
 const inputsOf=r=>{const o={};for(const k in r.inputs)o[k]=tv('in.'+r.id+'.'+k,r.inputs[k]);return o;};
 
@@ -590,7 +612,7 @@ function accNode(node){
 }
 function accPlot(p){
   if(!p)return null;
-  const step=ms(growOf(S,p.crop)),cap=plotCap();
+  const step=ms(plotGrow(p,p.crop)),cap=plotCap();
   if(p.n===undefined)p.n=0;
   if(step>0&&now()>p.at){
     const g=Math.floor((now()-p.at)/step);
@@ -706,14 +728,24 @@ function collect(i){
   S.jobs.splice(i,1);toast(names.join(' / '));save();renderKeep();
 }
 function plant(i,k){if(!CROPS[k]||!cropOpen(S,k))return;
-  S.plots[i]={crop:k,at:now(),n:0};save();renderKeep();}
+  /* 植え替えると、入れていた物は土ごと入れ替わる */
+  S.plots[i]={crop:k,at:now(),n:0,fert:null};save();renderKeep();}
+function applyFert(i,id){
+  const p=S.plots[i];
+  if(!p){toast('先に何か植える');return;}
+  if(!FERT[id]||count(id)<1){toast('持っていない');return;}
+  if(p.fert===id)return;
+  S.inv[id]=count(id)-1;
+  p.fert=id;save();renderKeep();
+  toast(ITEMS[id].icon+' 入れた');
+}
 /* 植え替え。たまっている分は先に収穫しておく必要がある */
 function replant(i,k){const p=S.plots[i];
   if(p&&p.n>0){toast('先に収穫してから');return;}
   plant(i,k);}
 function harvest(i){const p=accPlot(S.plots[i]);if(!p||p.n<1)return;
   const k=CROPS[p.crop]?p.crop:'wheat';
-  const per=Math.max(1,cropYield(S,k));
+  const per=Math.max(1,plotYield(p,k));
   const take=Math.min(p.n,Math.floor(roomFor(S,k)/per));
   if(take<1){toast(FULLMSG);return;}
   const n=giveIn(S,k,take*per);
@@ -817,7 +849,7 @@ function entry(r,t){const k=Object.keys(r.out)[0],it=ITEMS[k];
 /* ============================================================
    表示層
    ============================================================ */
-let tab='area',fac=null,area=null,facView='make',WELCOME=null;
+let tab='area',fac=null,area=null,facView='make',plotSel=null,WELCOME=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const mmss=m=>{const s=Math.max(0,Math.ceil(m/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -1089,28 +1121,64 @@ function plotsHtml(){
   syncPlots();
   if(!S.plots.length)return '<div class="card sub">畑がまだない。板材×4 と 石×3 で作れる。'+
     '畑を追加で作れば区画が増える。</div>';
+  if(plotSel!==null&&plotSel<S.plots.length)return plotDetail(plotSel);
   const cap=plotCap();
-  const open=Object.keys(CROPS).filter(k=>cropOpen(S,k));
-  const seedBtns=i=>open.map(k=>'<button class="seed" onclick="replant('+i+',\''+k+'\')">'+
-    CROPS[k].icon+'</button>').join('');
   return '<div class="plots">'+S.plots.map((p,i)=>{
-    /* 作物が1種類しかない序盤は、絵文字だけのボタンだと何をする所か伝わらない */
-    if(!p)return '<div class="plot"><div class="pi">🟫</div><div class="pt">空き</div>'+
-      (open.length>1?'<div class="seeds">'+seedBtns(i)+'</div>'
-        :'<button onclick="replant('+i+',\''+open[0]+'\')">植える</button>')+'</div>';
+    if(!p)return '<div class="plot" onclick="goPlot('+i+')">'+
+      '<div class="pi">🟫</div><div class="pt">空き</div><div class="pf">植える</div></div>';
     const k=CROPS[p.crop]?p.crop:'wheat',cr=CROPS[k];
-    const step=ms(growOf(S,k));
+    const step=ms(plotGrow(p,k));
     const full=p.n>=cap,left=full?0:Math.max(0,p.at+step-now());
-    return '<div class="plot"><div class="pi">'+(p.n?cr.icon:cr.seed)+'</div>'+
+    const f=fertOf(p);
+    return '<div class="plot'+(p.n?' run':'')+'" onclick="goPlot('+i+')">'+
+      '<div class="pi">'+(p.n?cr.icon:cr.seed)+'</div>'+
       '<div class="pt'+(full?' warn':'')+'">'+(p.n?p.n+' / '+cap+'回':mmss(left))+'</div>'+
+      '<div class="pf">'+(f?ITEMS[p.fert].icon+' '+ITEMS[p.fert].name:'—')+'</div></div>';
+  }).join('')+'</div><div class="sub" style="margin:8px 2px">'+
+  '区画をタップすると、育てる物と入れる物を選べる。'+
+  '収穫しなくても '+cap+'回分までたまり、一度植えれば植え直しはいらない。</div>';
+}
+/* 区画1つぶんの画面。ここで作物と肥料を決める */
+function plotDetail(i){
+  const p=S.plots[i],cap=plotCap();
+  let h='<div class="row" style="margin:2px 2px 10px">'+
+    '<button class="ghost" onclick="goPlot(null)">← 畑</button>'+
+    '<div class="ico">🟩</div>'+
+    '<div class="grow"><div class="name">区画 '+(i+1)+' / '+S.plots.length+'</div></div></div>';
+  if(p){
+    const k=CROPS[p.crop]?p.crop:'wheat',cr=CROPS[k];
+    const step=ms(plotGrow(p,k)),full=p.n>=cap;
+    const left=full?0:Math.max(0,p.at+step-now());
+    const per=plotYield(p,k),f=fertOf(p);
+    h+='<div class="card run"><div class="row"><div class="ico">'+(p.n?cr.icon:cr.seed)+'</div>'+
+      '<div class="grow"><div class="name">'+cr.name+
+      (f?'<span class="tag t">'+ITEMS[p.fert].name+'</span>':'')+'</div>'+
+      '<div class="sub">'+dur(plotGrow(p,k))+'で'+per+'個　'+
+      (full?'満杯':'次まで '+mmss(left))+'</div></div>'+
       '<button onclick="harvest('+i+')"'+(p.n?'':' disabled')+'>'+
-      (p.n?'収穫 ×'+(p.n*cropYield(S,k)):'育成中')+'</button>'+
-      (open.length>1?'<div class="seeds">'+seedBtns(i)+'</div>':'')+'</div>';
-  }).join('')+'</div><div class="sub" style="margin:8px 2px">区画 '+S.plots.length+
-  '　'+open.map(k=>CROPS[k].icon+CROPS[k].name+' '+dur(growOf(S,k))+'で'+
-    cropYield(S,k)+'個').join('　/　')+
-  '<br>収穫しなくても '+cap+'回分までたまる。一度植えれば植え直しはいらない。'+
-  (open.length>1?'下の種アイコンで植える物を変えられる（たまっている分は先に収穫）。':'')+'</div>';
+      (p.n?'収穫 ×'+(p.n*per):'育成中')+'</button></div>'+
+      '<div class="bar"><i style="width:'+(full?100:Math.max(0,Math.min(100,100-left/step*100)))+'%"></i></div>'+
+      '<div class="sub" style="margin-top:6px">たまり '+p.n+' / '+cap+'</div></div>';
+  }else h+='<div class="card sub">まだ何も植えていない。</div>';
+  const open=Object.keys(CROPS).filter(x=>cropOpen(S,x));
+  h+='<h2>育てる物</h2><div class="card">'+open.map(x=>
+    '<div class="row" style="padding:5px 0"><div class="ico">'+CROPS[x].icon+'</div>'+
+    '<div class="grow"><div class="name">'+CROPS[x].name+'</div>'+
+    '<div class="sub">'+dur(growOf(S,x))+'で'+cropYield(S,x)+'個</div></div>'+
+    '<button class="alt" onclick="replant('+i+',\''+x+'\')"'+
+    (p&&p.crop===x?' disabled':'')+'>'+(p&&p.crop===x?'育成中':'植える')+'</button></div>'
+  ).join('')+'</div>';
+  h+='<h2>入れる物</h2><div class="card">'+Object.keys(FERT).map(x=>{
+    const have=Math.floor(count(x)),on=!!p&&p.fert===x;
+    return '<div class="row" style="padding:5px 0"><div class="ico">'+ITEMS[x].icon+'</div>'+
+      '<div class="grow"><div class="name">'+ITEMS[x].name+
+      (on?'<span class="tag t">入っている</span>':'')+'</div>'+
+      '<div class="sub">'+FERT[x].note+'　所持 '+have+'</div></div>'+
+      '<button class="alt" onclick="applyFert('+i+',\''+x+'\')"'+
+      ((!p||on||have<1)?' disabled':'')+'>入れる</button></div>';
+  }).join('')+'<div class="sub" style="margin-top:6px">'+
+  '入れた物は、その区画を植え替えると土ごと入れ替わる。</div></div>';
+  return h;
 }
 
 function viewCodex(){
@@ -1251,7 +1319,7 @@ function buildWelcome(away){
     const a=accNode(n);if(a.n>0)rows.push(n.icon+n.name+'×'+a.n);});
   const crop={};
   S.plots.forEach(p=>{if(!p||!p.n)return;const k=CROPS[p.crop]?p.crop:'wheat';
-    crop[k]=(crop[k]||0)+p.n*cropYield(S,k);});
+    crop[k]=(crop[k]||0)+p.n*plotYield(p,k);});
   Object.keys(crop).forEach(k=>rows.push(CROPS[k].icon+CROPS[k].name+'×'+crop[k]));
   const dn=S.jobs.filter(j=>now()>=j.done).length;
   if(dn>0)rows.push('🔥加工×'+dn+'（完成）');
@@ -1306,7 +1374,8 @@ function renderKeep(){
   if(y&&Math.abs(y2-y)>1)window.scrollTo(0,y);
 }
 function go(id){tab=id;fac=null;area=null;render();}
-function goFac(id){fac=id;facView='make';render();}
+function goFac(id){fac=id;facView='make';plotSel=null;render();}
+function goPlot(i){plotSel=i;render();}
 function goFacView(v){facView=v;render();}
 function goArea(id){area=id;render();}
 /* 倍率を変えても、すでに動いている加工や蓄積が置き去りにならないよう、
