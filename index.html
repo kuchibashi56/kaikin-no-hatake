@@ -140,14 +140,15 @@ const ITEMS={
   stone: {name:'石',    icon:'🪨',kind:'material'},
   log:   {name:'丸太',  icon:'🪵',kind:'material'},
   plank: {name:'板材',  icon:'🟫',kind:'material'},
-  wheat: {name:'麦',    icon:'🌾',kind:'material'},
+  wheat: {name:'麦',    icon:'🌾',kind:'material',cat:'food'},
   flour: {name:'小麦粉',icon:'🏺',kind:'material'},
-  bread: {name:'パン',  icon:'🍞',kind:'material'},
-  potato:{name:'じゃがいも',icon:'🥔',kind:'material'},
-  baked: {name:'焼き芋',icon:'🍠',kind:'material'},
+  sawdust:{name:'木くず',icon:'🟨',kind:'material'},
+  bread: {name:'パン',  icon:'🍞',kind:'material',cat:'food'},
+  potato:{name:'じゃがいも',icon:'🥔',kind:'material',cat:'food'},
+  baked: {name:'焼き芋',icon:'🍠',kind:'material',cat:'food'},
 
   /* ---- Tier 4 の素材 ---- */
-  berry:  {name:'木の実',  icon:'🫐',kind:'material'},
+  berry:  {name:'木の実',  icon:'🫐',kind:'material',cat:'food'},
   herb:   {name:'薬草',    icon:'🍃',kind:'material'},
   cobweb: {name:'クモの巣',icon:'🕸',kind:'material'},
   cuore:  {name:'銅鉱石',  icon:'🔶',kind:'material'},
@@ -155,30 +156,30 @@ const ITEMS={
   thread: {name:'糸',      icon:'🧵',kind:'material'},
   cloth:  {name:'布',      icon:'🧶',kind:'material'},
   rope:   {name:'縄',      icon:'🪢',kind:'material'},
-  meat:   {name:'生肉',    icon:'🍖',kind:'material'},
+  meat:   {name:'生肉',    icon:'🍖',kind:'material',cat:'food'},
   hide:   {name:'毛皮',    icon:'🧳',kind:'material'},
-  fish:   {name:'魚',      icon:'🐟',kind:'material'},
+  fish:   {name:'魚',      icon:'🐟',kind:'material',cat:'food'},
   salt:   {name:'塩',      icon:'🧂',kind:'material'},
   spice:  {name:'香辛料',  icon:'🌶',kind:'material'},
   feed:   {name:'飼葉',    icon:'🪴',kind:'material'},
   cage:   {name:'生け捕りの檻',icon:'🧺',kind:'material'},
   trap:   {name:'罠',      icon:'🪤',kind:'material'},
-  egg:    {name:'卵',      icon:'🥚',kind:'material'},
-  milk:   {name:'乳',      icon:'🥛',kind:'material'},
+  egg:    {name:'卵',      icon:'🥚',kind:'material',cat:'food'},
+  milk:   {name:'乳',      icon:'🥛',kind:'material',cat:'food'},
 
   /* ---- 料理 ---- */
-  cheese: {name:'チーズ',      icon:'🧀',kind:'material'},
-  jerky:  {name:'干し肉',      icon:'🥓',kind:'material'},
-  soup:   {name:'野菜スープ',  icon:'🍲',kind:'material'},
-  pie:    {name:'木の実のパイ',icon:'🥧',kind:'material'},
-  grilled:{name:'焼き魚',      icon:'🍢',kind:'material'},
-  cornbread:{name:'コーンブレッド',icon:'🫓',kind:'material'},
+  cheese: {name:'チーズ',      icon:'🧀',kind:'material',cat:'food'},
+  jerky:  {name:'干し肉',      icon:'🥓',kind:'material',cat:'food'},
+  soup:   {name:'野菜スープ',  icon:'🍲',kind:'material',cat:'food'},
+  pie:    {name:'木の実のパイ',icon:'🥧',kind:'material',cat:'food'},
+  grilled:{name:'焼き魚',      icon:'🍢',kind:'material',cat:'food'},
+  cornbread:{name:'コーンブレッド',icon:'🫓',kind:'material',cat:'food'},
 
   /* ---- 集落 ---- */
   fame:  {name:'評判',      icon:'🎖',kind:'material'},
   steel: {name:'鋼',        icon:'🔗',kind:'material'},
   cseed: {name:'珍しい種',  icon:'🌰',kind:'material'},
-  corn:  {name:'とうもろこし',icon:'🌽',kind:'material'},
+  corn:  {name:'とうもろこし',icon:'🌽',kind:'material',cat:'food'},
   ore:   {name:'鉱石',  icon:'🧱',kind:'material'},
   iron:  {name:'鉄',    icon:'🔩',kind:'material'},
 
@@ -191,9 +192,8 @@ const ITEMS={
   brick:   {name:'レンガ',icon:'🟧',kind:'material'},
 
   workbench:{name:'作業台',  icon:'🛠', kind:'station'},
-  mill:     {name:'石臼',    icon:'⚙️',kind:'station'},
+  mill:     {name:'粉引き機',icon:'⚙️',kind:'station'},
   furnace:  {name:'炉',      icon:'🔥',kind:'station'},
-  workshop: {name:'複合工房',icon:'🏭',kind:'station'},
   farm:     {name:'畑',      icon:'🟩',kind:'plot'},
   crate:    {name:'収納箱',  icon:'📦',kind:'storage'},
   vault:    {name:'石蔵',    icon:'🏯',kind:'storage'},
@@ -202,7 +202,7 @@ const ITEMS={
   compost:  {name:'堆肥箱',  icon:'🍂',kind:'station',
              mods:[{k:'grow.wheat',mul:0.75},{k:'cy.wheat',add:1}]},
   pantry:   {name:'保存食棚',icon:'🍱',kind:'station',
-             mods:[{k:'cd.branch',mul:0.75},{k:'cd.log',mul:0.8}]},
+             caps:[{cat:'food',add:60}]},
   loom:     {name:'織機',    icon:'🪡',kind:'station'},
   kitchen:  {name:'調理場',  icon:'🍳',kind:'station'},
   /* 家畜は「設備」として扱う。飼葉を入れて待つと産物が出る仕組みで、
@@ -281,67 +281,74 @@ const NODES=[
 
 /* station : 1つ以上持っていれば作れる。消費されない
    time    : 秒。入れると「投入して待つ」加工になる（並列数＝設備の個数） */
+/* 収納箱は置ける数に限りがある。石蔵を建てると枠が開く。
+   RECIPES の中で参照するので、ここで先に宣言しておく */
+const CRATE_BASE=4, CRATE_PER_VAULT=4;
+
 const RECIPES=[
   {id:'workbench',out:{workbench:1},inputs:{branch:4,stone:2},station:null,
    unlock:['start'],reveal:['start'],hint:'拾った物を組み合わせる台'},
-  {id:'stone_axe',out:{stone_axe:1},inputs:{branch:6,stone:3},station:['workbench','workshop'],
+  {id:'stone_axe',out:{stone_axe:1},inputs:{branch:6,stone:3},station:['workbench'],
    unlock:['got:workbench'],reveal:['start'],hint:'枝と石でできる、何か'},
-  {id:'plank',out:{plank:2},inputs:{log:1},station:['workbench','workshop'],
+  {id:'plank',out:{plank:2},inputs:{log:1},station:['workbench'],
    unlock:['got:stone_axe'],reveal:['got:workbench'],hint:'丸太を割ると2つ取れる物'},
-  {id:'farm',out:{farm:1},inputs:{plank:4,stone:3},station:['workbench','workshop'],
+  {id:'farm',out:{farm:1},inputs:{plank:4,stone:3},station:['workbench'],
    unlock:['got:plank'],reveal:['got:stone_axe'],hint:'板材×4 と 石×3'},
-  {id:'crate',out:{crate:1},inputs:{plank:4,branch:2},station:['workbench','workshop'],
+  {id:'crate',out:{crate:1},inputs:{plank:4,branch:2},station:['workbench'],
+   limit:{item:'crate',base:CRATE_BASE,per:CRATE_PER_VAULT,from:'vault'},
    unlock:['got:plank'],reveal:['got:workbench'],hint:'しまっておく物。置ける量が増える'},
-  {id:'mill',out:{mill:1},inputs:{wheat:12,plank:6},station:['workbench','workshop'],
+  {id:'sawdust',out:{sawdust:3},inputs:{branch:5},station:['mill'],time:50,
+   unlock:['got:mill'],reveal:['got:mill'],hint:'枝を挽くと出る細かい物'},
+  {id:'dustcoal',out:{charcoal:1},inputs:{sawdust:6},station:['furnace'],time:80,
+   unlock:['got:sawdust'],reveal:['got:sawdust'],hint:'木くずをまとめて蒸し焼きにする'},
+  {id:'mill',out:{mill:1},inputs:{wheat:12,plank:6},station:['workbench'],
    unlock:['got:wheat'],reveal:['got:farm'],hint:'麦×12 と 板材×6'},
-  {id:'flour',out:{flour:1},inputs:{wheat:4},station:['mill','workshop'],
+  {id:'flour',out:{flour:1},inputs:{wheat:4},station:['mill'],
    unlock:['got:mill'],reveal:['got:mill'],hint:'麦を挽いた物'},
-  {id:'bread',out:{bread:1},inputs:{flour:3},station:['mill','workshop'],
+  {id:'bread',out:{bread:1},inputs:{flour:3},station:['mill'],
    unlock:['got:flour'],reveal:['got:mill'],hint:'小麦粉を使う何か'},
-  {id:'workshop',out:{workshop:1},inputs:{workbench:1,mill:1,plank:6},station:['workbench'],
-   unlock:['got:bread'],reveal:['got:mill'],hint:'設備を2つ食う、大きな何か'},
 
   /* ---- Tier 2 ここから ---- */
-  {id:'pickaxe',out:{pickaxe:1},inputs:{branch:4,stone:4},station:['workbench','workshop'],
+  {id:'pickaxe',out:{pickaxe:1},inputs:{branch:4,stone:4},station:['workbench'],
    unlock:['got:plank'],reveal:['got:stone_axe'],hint:'斧とは別の、削る道具'},
-  {id:'furnace',out:{furnace:1},inputs:{stone:8,plank:2},station:['workbench','workshop'],
+  {id:'furnace',out:{furnace:1},inputs:{stone:8,plank:2},station:['workbench'],
    unlock:['got:ore'],reveal:['got:pickaxe'],hint:'石×8 と 板材×2'},
   {id:'iron',out:{iron:1},inputs:{ore:2,branch:3},station:['furnace'],time:120,
    unlock:['got:furnace'],reveal:['got:furnace'],hint:'鉱石を燃やして得る物'},
-  {id:'iron_axe',out:{iron_axe:1},inputs:{iron:3,plank:2},station:['workbench','workshop'],
+  {id:'iron_axe',out:{iron_axe:1},inputs:{iron:3,plank:2},station:['workbench'],
    unlock:['got:iron'],reveal:['got:furnace'],hint:'鉄で打ち直した斧'},
 
   /* ---- Tier 3 ここから ---- */
-  {id:'shovel',out:{shovel:1},inputs:{plank:2,branch:3},station:['workbench','workshop'],
+  {id:'shovel',out:{shovel:1},inputs:{plank:2,branch:3},station:['workbench'],
    unlock:['got:plank'],reveal:['got:stone_axe'],hint:'土と砂を掘り返す物'},
   {id:'charcoal',out:{charcoal:1},inputs:{log:1},station:['furnace'],time:90,
    unlock:['got:furnace'],reveal:['got:furnace'],hint:'丸太をじっくり蒸し焼きにした物'},
-  {id:'bucket',out:{bucket:1},inputs:{plank:3,iron:1},station:['workbench','workshop'],
+  {id:'bucket',out:{bucket:1},inputs:{plank:3,iron:1},station:['workbench'],
    unlock:['got:iron'],reveal:['got:furnace'],hint:'水を汲むための物'},
   {id:'glass',out:{glass:2},inputs:{sand:4,charcoal:1},station:['furnace'],time:120,
    unlock:['got:sand'],reveal:['got:sand'],hint:'砂を溶かすと透ける'},
-  {id:'clay',out:{clay:2},inputs:{sand:2,water:1},station:['workbench','workshop'],
+  {id:'clay',out:{clay:2},inputs:{sand:2,water:1},station:['workbench'],
    unlock:['got:water'],reveal:['got:sand'],hint:'砂と水を練った物'},
   {id:'brick',out:{brick:1},inputs:{clay:2},station:['furnace'],time:110,
    unlock:['got:clay'],reveal:['got:clay'],hint:'粘土を焼き固めた物'},
-  {id:'lantern',out:{lantern:1},inputs:{glass:2,iron:1,charcoal:1},station:['workbench','workshop'],
+  {id:'lantern',out:{lantern:1},inputs:{glass:2,iron:1,charcoal:1},station:['workbench'],
    unlock:['got:glass'],reveal:['got:glass'],hint:'暗い所を照らす物'},
-  {id:'bellows',out:{bellows:1},inputs:{iron:2,plank:4,glass:1},station:['workbench','workshop'],
+  {id:'bellows',out:{bellows:1},inputs:{iron:2,plank:4,glass:1},station:['workbench'],
    unlock:['got:glass'],reveal:['got:glass'],hint:'炉に風を送る物'},
   {id:'compost',out:{compost:1},inputs:{plank:4,wheat:8,potato:6,water:2},
-   station:['workbench','workshop'],
+   station:['workbench'],
    unlock:['got:water'],reveal:['got:farm'],hint:'畑に入れると早く育つ物'},
-  {id:'vault',out:{vault:1},inputs:{brick:8,plank:6},station:['workshop'],
+  {id:'vault',out:{vault:1},inputs:{brick:8,stone:14,plank:6},station:['workbench'],
    unlock:['got:brick'],reveal:['got:brick'],hint:'たくさんしまえる、大きな物'},
   {id:'baked',out:{baked:1},inputs:{potato:3,charcoal:1},station:['furnace'],time:100,
    unlock:['got:potato'],reveal:['got:potato'],hint:'芋を炭火でじっくり焼いた物'},
-  {id:'pantry',out:{pantry:1},inputs:{baked:2,bread:2,plank:4},station:['workbench','workshop'],
+  {id:'pantry',out:{pantry:1},inputs:{baked:2,bread:2,plank:4},station:['workbench'],
    unlock:['got:baked'],reveal:['got:bread'],hint:'蓄えがあると、よく働ける'},
 
   /* ---- Tier 4: 洞窟の奥と繊維 ---- */
-  {id:'rope',out:{rope:2},inputs:{cobweb:6,branch:4},station:['workbench','workshop'],
+  {id:'rope',out:{rope:2},inputs:{cobweb:6,branch:4},station:['workbench'],
    unlock:['got:cobweb'],reveal:['got:cobweb'],hint:'巣の糸を撚り合わせた物'},
-  {id:'loom',out:{loom:1},inputs:{plank:8,iron:2},station:['workbench','workshop'],
+  {id:'loom',out:{loom:1},inputs:{plank:8,iron:2},station:['workbench'],
    unlock:['got:cobweb'],reveal:['got:cobweb'],hint:'糸を織るための台'},
   {id:'thread',out:{thread:2},inputs:{cobweb:4},station:['loom'],time:70,
    unlock:['got:loom'],reveal:['got:loom'],hint:'巣をほぐして紡いだ物'},
@@ -351,25 +358,25 @@ const RECIPES=[
    unlock:['got:cuore'],reveal:['got:cuore'],hint:'赤い鉱石を溶かした物'},
 
   /* ---- 移動手段。これがエリアを開く ---- */
-  {id:'rod',out:{rod:1},inputs:{branch:4,thread:3},station:['workbench','workshop'],
+  {id:'rod',out:{rod:1},inputs:{branch:4,thread:3},station:['workbench'],
    unlock:['got:thread'],reveal:['got:thread'],hint:'水の中の物を獲る道具'},
-  {id:'cart',out:{cart:1},inputs:{plank:8,iron:3,rope:2},station:['workbench','workshop'],
+  {id:'cart',out:{cart:1},inputs:{plank:8,iron:3,rope:2},station:['workbench'],
    unlock:['got:rope'],reveal:['got:rope'],hint:'荷を載せて遠くへ行く物'},
-  {id:'boat',out:{boat:1},inputs:{plank:10,cloth:4,rope:3},station:['workshop'],
+  {id:'boat',out:{boat:1},inputs:{plank:10,cloth:4,rope:3},station:['workbench'],
    unlock:['got:cloth'],reveal:['got:cloth'],hint:'水に浮かぶ物'},
 
   /* ---- 狩りと家畜 ---- */
-  {id:'feed',out:{feed:3},inputs:{wheat:3,potato:2},station:['workbench','workshop'],
+  {id:'feed',out:{feed:3},inputs:{wheat:3,potato:2},station:['workbench'],
    unlock:['got:potato'],reveal:['got:farm'],hint:'動物に与える物'},
-  {id:'trap',out:{trap:1},inputs:{iron:2,rope:1},station:['workbench','workshop'],
+  {id:'trap',out:{trap:1},inputs:{iron:2,rope:1},station:['workbench'],
    unlock:['got:rope'],reveal:['got:rope'],hint:'仕掛けて獲物を待つ物'},
   {id:'hunt',out:{meat:2,hide:1},inputs:{trap:1,feed:2},station:null,
    unlock:['got:herb'],reveal:['got:trap'],hint:'山に仕掛ける。罠と餌を使う'},
-  {id:'cage',out:{cage:1},inputs:{plank:4,rope:2,hide:2},station:['workbench','workshop'],
+  {id:'cage',out:{cage:1},inputs:{plank:4,rope:2,hide:2},station:['workbench'],
    unlock:['got:hide'],reveal:['got:hide'],hint:'生きたまま捕らえる物'},
-  {id:'chicken',out:{chicken:1},inputs:{cage:1,feed:4},station:['workbench','workshop'],
+  {id:'chicken',out:{chicken:1},inputs:{cage:1,feed:4},station:['workbench'],
    unlock:['got:cage'],reveal:['got:cage'],hint:'手なずけると、毎日なにか産む'},
-  {id:'goat',out:{goat:1},inputs:{cage:1,feed:8,herb:4},station:['workbench','workshop'],
+  {id:'goat',out:{goat:1},inputs:{cage:1,feed:8,herb:4},station:['workbench'],
    unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏より気難しい'},
   {id:'egg',out:{egg:2},inputs:{feed:3},station:['chicken'],time:360,
    unlock:['got:chicken'],reveal:['got:chicken'],hint:'鶏に飼葉を与えて待つ'},
@@ -406,7 +413,7 @@ const RECIPES=[
    unlock:['got:herbalist'],reveal:['got:herbalist'],hint:'畑によく効くという袋'},
 
   /* ---- 料理 ---- */
-  {id:'kitchen',out:{kitchen:1},inputs:{brick:6,plank:6,copper:2},station:['workshop'],
+  {id:'kitchen',out:{kitchen:1},inputs:{brick:6,plank:6,copper:2},station:['workbench'],
    unlock:['got:copper'],reveal:['got:brick'],hint:'火と水を使う場所'},
   {id:'jerky',out:{jerky:2},inputs:{meat:3,salt:2},station:['kitchen'],time:280,
    unlock:['got:salt'],reveal:['got:kitchen'],hint:'肉を塩で保たせた物'},
@@ -421,7 +428,7 @@ const RECIPES=[
   {id:'cornbread',out:{cornbread:2},inputs:{corn:3,flour:2,milk:1},station:['kitchen'],time:300,
    unlock:['got:corn'],reveal:['got:cseed'],hint:'新しい穀物を焼いた物'},
 
-  {id:'frontier',out:{},inputs:{cornbread:2,steel:2,spice:2},station:['workshop'],
+  {id:'frontier',out:{},inputs:{cornbread:2,steel:2,spice:2},station:['workbench'],
    unlock:['never'],reveal:['got:charm'],hint:'さらに先の何か … まだ作れない'},
 ];
 
@@ -462,7 +469,7 @@ const KEY='kuchibashi-craft-v3';
 /* セーブの版。形を変えたら上げて、migrate に移行を書き足す。
    fresh に v を入れないのは、版を持たない古いセーブを
    Object.assign した時に「新しい版」と誤認しないため */
-const SAVE_V=2;
+const SAVE_V=3;
 const fresh=()=>({inv:{},flags:{},acc:{},plots:[],jobs:[],scale:1,tune:{},lastSeen:0});
 
 /* セーブの形を今の版にそろえる。起動時と取り込み時の両方から通す */
@@ -476,6 +483,13 @@ function migrate(){
   if(!S.v&&S.ready)delete S.ready;
   S.plots=(S.plots||[]).map(p=>p?{crop:CROPS[p.crop]?p.crop:'wheat',
     at:(+p.at||Date.now()),n:(+p.n||0)}:null);
+  /* v2 以前: 複合工房を持っていた人には、食べた2つの設備を返す */
+  if(S.inv&&S.inv.workshop){
+    S.inv.workbench=(S.inv.workbench||0)+S.inv.workshop;
+    S.inv.mill=(S.inv.mill||0)+S.inv.workshop;
+    delete S.inv.workshop;
+    S.flags['got:workbench']=1;S.flags['got:mill']=1;
+  }
   /* 無くなったレシピや設備を指しているジョブは捨てる。
      残したまま描こうとすると画面ごと落ちるため */
   S.jobs=(S.jobs||[]).filter(j=>j&&ITEMS[j.station]&&RECIPES.some(r=>r.id===j.id));
@@ -570,12 +584,32 @@ function accrueAll(){NODES.forEach(accNode);S.plots.forEach(accPlot);}
 const allOk=(c,l)=>l.every(f=>flagOk(c,f));
 const affordIn=(c,i)=>Object.keys(i).every(k=>cnt(c,k)>=i[k]);
 /* 素材1種あたりの保管上限。収納箱を作ると増える */
-const invCap=c=>Math.min(tv('cap.max',CAP_MAX),
+/* caps を持つ物は、特定の種類（いまは食べ物）だけ上限を押し上げる */
+const catBonus=(c,id)=>{
+  const it=ITEMS[id];
+  if(!it||!it.cat)return 0;
+  let add=0;
+  for(const k in ITEMS){
+    const x=ITEMS[k];
+    if(!x.caps||cnt(c,k)<1)continue;
+    x.caps.forEach(cp=>{if(cp.cat===it.cat)add+=cp.add*cnt(c,k);});
+  }
+  return add;
+};
+const invCap=(c,id)=>Math.min(tv('cap.max',CAP_MAX),
   tv('cap.base',CAP_BASE)
   +cnt(c,'crate')*tv('cap.box',CAP_BOX)
-  +cnt(c,'vault')*tv('cap.vault',CAP_VAULT));
+  +cnt(c,'vault')*tv('cap.vault',CAP_VAULT)
+  +(id?catBonus(c,id):0));
+/* 建てられる数に上限があるレシピ（収納箱）。石蔵を建てると枠が開く */
+const limitOk=(c,r)=>!r.limit||cnt(c,r.limit.item)<
+  tv('limit.'+r.id+'.base',r.limit.base)+
+  tv('limit.'+r.id+'.per',r.limit.per)*cnt(c,r.limit.from);
+const limitOf=(c,r)=>!r.limit?0:
+  tv('limit.'+r.id+'.base',r.limit.base)+
+  tv('limit.'+r.id+'.per',r.limit.per)*cnt(c,r.limit.from);
 const isCapped=id=>!!ITEMS[id]&&ITEMS[id].kind==='material';
-const roomFor=(c,id)=>isCapped(id)?Math.max(0,invCap(c)-cnt(c,id)):Infinity;
+const roomFor=(c,id)=>isCapped(id)?Math.max(0,invCap(c,id)-cnt(c,id)):Infinity;
 /* 入りきる分だけ渡し、実際に入った数を返す */
 function giveIn(c,id,n){
   if(n<=0)return 0;
@@ -630,6 +664,7 @@ function gather(node){
 function craft(r){
   const inp=inputsOf(r);
   if(!ok(r.unlock)||!stationOk(S,r)||!affordIn(S,inp)||!slotOk(S,r))return;
+  if(!limitOk(S,r)){toast('これ以上は置けない。石蔵を建てると枠が増える');return;}
   if(!r.time&&!outFits(S,r)){toast(FULLMSG);return;}
   for(const k in inp)S.inv[k]=count(k)-inp[k];
   if(r.time){
@@ -735,7 +770,7 @@ function simulate(maxSec=86400){
       else if(t>=p.at+growOf(c,p.crop)){
         giveIn(c,p.crop,cropYield(c,p.crop));c.plots[i]=null;acted=true;}});
     for(const r of targets){
-      if(!allOk(c,r.unlock)||!stationOk(c,r)||!slotOk(c,r))continue;
+      if(!allOk(c,r.unlock)||!stationOk(c,r)||!slotOk(c,r)||!limitOk(c,r))continue;
       const inp=inputsOf(r);
       if(!affordIn(c,inp))continue;
       const outs=Object.keys(r.out);
@@ -884,7 +919,8 @@ function recipeCard(r){
   const inp=inputsOf(r),first=Object.keys(r.out)[0],it=ITEMS[first];
   const st=stationOk(S,r),slot=slotOk(S,r);
   const fits=!!r.time||outFits(S,r);
-  const can=st&&slot&&affordIn(S,inp)&&fits;
+  const lim=limitOk(S,r);
+  const can=st&&slot&&affordIn(S,inp)&&fits&&lim;
   const owned=first?Math.floor(count(first)):0,sx=stationFor(S,r);
   return '<div class="card"><div class="row"><div class="ico">'+(it?it.icon:'❔')+'</div>'+
     '<div class="grow"><div class="name">'+(it?it.name:'???')+
@@ -895,6 +931,9 @@ function recipeCard(r){
     (st&&r.time?'<div class="slotline'+(slot?'':' no')+'">'+ITEMS[sx].name+
       ' 稼働 '+busyAt(S,sx)+' / '+Math.floor(count(sx))+'</div>':'')+
     (fits?'':'<div class="need">置き場がない。収納箱を作ると増える</div>')+
+    (r.limit?'<div class="slotline'+(lim?'':' no')+'">置ける数 '+
+      Math.floor(count(r.limit.item))+' / '+limitOf(S,r)+
+      '（石蔵1つにつき +'+tv('limit.'+r.id+'.per',r.limit.per)+'）</div>':'')+
     '</div><button class="alt" onclick="craft(RECIPES.find(x=>x.id===\''+r.id+'\'))"'+
     (can?'':' disabled')+'>'+(r.time?'投入':'作る')+'</button></div></div>';
 }
@@ -902,15 +941,38 @@ function recipeCard(r){
 /* --- 施設 --- */
 const HANDID='hand';
 const FACKINDS=['station','plot','storage','villager'];
+/* そこで何かを作る施設ではなく、持っているだけで効く物か */
+const isPassive=k=>{
+  const it=ITEMS[k];
+  if(!it||!(it.mods||it.caps))return false;
+  return !RECIPES.some(r=>r.station&&r.station.indexOf(k)>=0);
+};
 function facilities(){
   /* 素手でできる物の置き場。作業台を作る前はここしかない */
   const out=[{id:HANDID,name:'手仕事',icon:'🤲',count:1,kind:'hand'}];
   Object.keys(ITEMS).forEach(k=>{
     const it=ITEMS[k],c=Math.floor(count(k));
     if(c<1||FACKINDS.indexOf(it.kind)<0)return;
+    /* 持っているだけで効く物は一覧では場所を取るだけなので、下にまとめる */
+    if(isPassive(k))return;
     out.push({id:k,name:it.name,icon:it.icon,count:c,kind:it.kind});
   });
   return out;
+}
+function capsLine(it){
+  if(!it||!it.caps)return '';
+  const name={food:'食べ物'};
+  return '<div class="mod">'+it.caps.map(c=>
+    (name[c.cat]||c.cat)+'の置ける量 +'+c.add).join('　')+'</div>';
+}
+/* 持っているだけで効く物の一覧。道具もここにまとめて出す */
+function passiveHtml(){
+  const ks=Object.keys(ITEMS).filter(k=>count(k)>=1&&(ITEMS[k].mods||ITEMS[k].caps));
+  if(!ks.length)return '';
+  return '<div class="card"><div class="name">持っているだけで効く物</div>'+
+    ks.map(k=>'<div style="margin-top:6px"><div class="sub">'+ITEMS[k].icon+' '+
+      ITEMS[k].name+(count(k)>1?' ×'+Math.floor(count(k)):'')+'</div>'+
+      modLine(ITEMS[k])+capsLine(ITEMS[k])+'</div>').join('')+'</div>';
 }
 const jobsAt=id=>S.jobs.map((j,i)=>({j:j,i:i}))
   .filter(x=>x.j.station===id&&RECIPES.some(r=>r.id===x.j.id));
@@ -999,6 +1061,7 @@ function viewFac(){
     (f.count>1?'<span class="tag s">×'+f.count+'</span>':'')+facStatus(f)+'</div>'+
     '<div class="sub">'+facDesc(f)+'</div></div>'+
     '<div class="ico chev">›</div></div></div>').join('')+
+    passiveHtml()+
     '<div class="sub" style="margin:4px 2px">同じ施設を増やすと、その数だけ加工を並べて走らせられる。'+
     '置ける量は素材1種あたり '+invCap(S)+'。</div>';
 }
@@ -1194,13 +1257,13 @@ const TABS=[
 function render(){
   syncPlots();
   const held=Object.keys(ITEMS).filter(k=>count(k)>0);
-  const icap=invCap(S);
   $('inv').innerHTML=held.length
     ? held.map(k=>{const mat=ITEMS[k].kind==='material',c=Math.floor(count(k));
+        const cap=invCap(S,k);
         /* 上限が近いときだけ分母を出す。普段は数字だけで読みやすく保つ */
-        return '<div class="chip'+(mat?'':' st')+(mat&&c>=icap?' full':'')+'">'+
+        return '<div class="chip'+(mat?'':' st')+(mat&&c>=cap?' full':'')+'">'+
           ITEMS[k].icon+' <b>'+c+'</b>'+
-          (mat&&c>=icap*0.8?'<span class="cp">/'+icap+'</span>':'')+'</div>';
+          (mat&&c>=cap*0.8?'<span class="cp">/'+cap+'</span>':'')+'</div>';
       }).join('')
     : '<div class="empty">持ち物なし。採取から始める。</div>';
   $('view').innerHTML=(tab==='tune'?'':welcomeHtml())+TABS.find(x=>x.id===tab).view()+
